@@ -64,7 +64,7 @@ members = [
     "rothschild",
     "metrics/core",
     "metrics/perf_monitor",
-    "utils/alloc",
+    "utils/alloc", "atan/core", "atan/client", "atan/server", "atan/data", "atan/validation",
 ]
 
 [workspace.package]
