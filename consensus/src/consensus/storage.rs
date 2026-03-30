@@ -30,6 +30,7 @@ use super::cache_policy_builder::CachePolicyBuilder as PolicyBuilder;
 use kaspa_consensus_core::{BlockHashSet, blockstatus::BlockStatus};
 use kaspa_database::registry::DatabaseStorePrefixes;
 use kaspa_hashes::Hash;
+use kaspa_smt_store::processor::SmtStores;
 use parking_lot::RwLock;
 use std::{ops::DerefMut, sync::Arc};
 
@@ -66,6 +67,9 @@ pub struct ConsensusStorage {
     // Block window caches
     pub block_window_cache_for_difficulty: Arc<BlockWindowCacheStore>,
     pub block_window_cache_for_past_median_time: Arc<BlockWindowCacheStore>,
+
+    // SMT stores (KIP-21 lane processing)
+    pub smt_stores: Arc<SmtStores>,
 
     // "Last Known Good" caches
     /// The "last known good" virtual state. To be used by any logic which does not want to wait
@@ -224,6 +228,10 @@ impl ConsensusStorage {
         let virtual_stores =
             Arc::new(RwLock::new(VirtualStores::new(db.clone(), lkg_virtual_state.clone(), utxo_set_builder.build())));
 
+        // SMT stores (KIP-21)
+        // TODO: make cache capacities configurable via consensus params
+        let smt_stores = Arc::new(SmtStores::new(db.clone(), 500_000, 50_000));
+
         // Ensure that reachability stores are initialized
         reachability::init(reachability_store.write().deref_mut()).unwrap();
         relations::init(reachability_relations_store.write().deref_mut());
@@ -252,6 +260,7 @@ impl ConsensusStorage {
             utxo_multisets_store,
             block_window_cache_for_difficulty,
             block_window_cache_for_past_median_time,
+            smt_stores,
             lkg_virtual_state,
         })
     }

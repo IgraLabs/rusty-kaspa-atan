@@ -60,7 +60,7 @@ dependencies = [
  "getrandom 0.2.15",
  "once_cell",
  "version_check",
- "zerocopy",
+ "zerocopy 0.7.35",
 ]
 
 [[package]]
@@ -2644,9 +2644,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.10.1"
+version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddc24109865250148c2e0f3d25d4f0f479571723792d3802153c60922a4fb708"
+checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
 
 [[package]]
 name = "is-terminal"
@@ -2752,7 +2752,7 @@ dependencies = [
  "rocksdb",
  "rv",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -2784,7 +2784,7 @@ dependencies = [
  "serde",
  "sha2",
  "subtle",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "workflow-wasm",
  "zeroize",
@@ -2823,7 +2823,7 @@ dependencies = [
  "serde",
  "serde_json",
  "textwrap 0.16.1",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "wasm-bindgen",
  "web-sys",
@@ -2880,6 +2880,9 @@ dependencies = [
  "kaspa-muhash",
  "kaspa-notify",
  "kaspa-pow",
+ "kaspa-seq-commit",
+ "kaspa-smt",
+ "kaspa-smt-store",
  "kaspa-txscript",
  "kaspa-txscript-errors",
  "kaspa-utils",
@@ -2894,7 +2897,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -2921,7 +2924,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "workflow-log",
@@ -2958,7 +2961,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "smallvec",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
@@ -2983,7 +2986,7 @@ dependencies = [
  "kaspa-utils",
  "log",
  "paste",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "triggered",
 ]
 
@@ -3005,7 +3008,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "workflow-log",
  "workflow-wasm",
@@ -3042,7 +3045,7 @@ dependencies = [
  "log",
  "log4rs",
  "num_cpus",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "triggered",
  "wasm-bindgen",
@@ -3063,7 +3066,7 @@ dependencies = [
  "kaspa-wallet-core",
  "nw-sys",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "workflow-core",
  "workflow-log",
  "workflow-node",
@@ -3090,7 +3093,7 @@ dependencies = [
  "serde",
  "smallvec",
  "tempfile",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3118,7 +3121,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "rustls",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -3147,7 +3150,7 @@ dependencies = [
  "prost",
  "rand 0.8.5",
  "regex",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -3184,7 +3187,7 @@ dependencies = [
  "prost",
  "rand 0.8.5",
  "rustls",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -3215,13 +3218,14 @@ dependencies = [
  "js-sys",
  "kaspa-utils",
  "keccak",
- "once_cell",
  "rand 0.8.5",
  "serde",
  "sha2",
+ "sha2-const-stable",
  "sha3",
  "wasm-bindgen",
  "workflow-wasm",
+ "zerocopy 0.8.42",
 ]
 
 [[package]]
@@ -3239,7 +3243,7 @@ dependencies = [
  "log",
  "paste",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "triggered",
 ]
 
@@ -3266,7 +3270,7 @@ dependencies = [
  "parking_lot",
  "paste",
  "rand 0.8.5",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "triggered",
 ]
@@ -3285,7 +3289,7 @@ dependencies = [
  "rand_chacha 0.3.1",
  "serde",
  "serde-wasm-bindgen",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "workflow-core",
  "workflow-log",
@@ -3310,7 +3314,7 @@ dependencies = [
  "kaspa-rpc-core",
  "separator",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "workflow-core",
  "workflow-log",
 ]
@@ -3338,7 +3342,7 @@ dependencies = [
  "serde",
  "smallvec",
  "sweep-bptree",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -3347,7 +3351,7 @@ name = "kaspa-mining-errors"
 version = "1.1.0"
 dependencies = [
  "kaspa-consensus-core",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3390,7 +3394,7 @@ dependencies = [
  "paste",
  "rand 0.8.5",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "triggered",
  "workflow-core",
@@ -3425,7 +3429,7 @@ dependencies = [
  "log",
  "parking_lot",
  "rand 0.8.5",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "uuid 1.18.1",
@@ -3454,7 +3458,7 @@ dependencies = [
  "rand 0.8.5",
  "seqlock",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -3486,7 +3490,7 @@ dependencies = [
  "kaspa-core",
  "log",
  "portable-atomic",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "workflow-perf-monitor",
 ]
@@ -3542,7 +3546,7 @@ dependencies = [
  "serde_json",
  "serde_nested_with",
  "smallvec",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "uuid 1.18.1",
  "wasm-bindgen",
  "workflow-core",
@@ -3593,6 +3597,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "kaspa-seq-commit"
+version = "1.1.0"
+dependencies = [
+ "kaspa-consensus-core",
+ "kaspa-hashes",
+ "kaspa-merkle",
+ "kaspa-smt",
+]
+
+[[package]]
+name = "kaspa-smt"
+version = "1.1.0"
+dependencies = [
+ "blake3",
+ "kaspa-hashes",
+ "rand 0.8.5",
+ "thiserror 2.0.18",
+ "zerocopy 0.8.42",
+]
+
+[[package]]
+name = "kaspa-smt-store"
+version = "1.1.0"
+dependencies = [
+ "kaspa-database",
+ "kaspa-hashes",
+ "kaspa-seq-commit",
+ "kaspa-smt",
+ "kaspa-utils",
+ "parking_lot",
+ "rocksdb",
+ "zerocopy 0.8.42",
+]
+
+[[package]]
 name = "kaspa-stratum-bridge"
 version = "1.1.0"
 dependencies = [
@@ -3628,7 +3667,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-test",
  "tracing",
@@ -3694,7 +3733,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "tempfile",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "workflow-perf-monitor",
 ]
@@ -3741,7 +3780,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "smallvec",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "workflow-wasm",
 ]
@@ -3753,7 +3792,7 @@ dependencies = [
  "borsh",
  "kaspa-hashes",
  "secp256k1",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3785,7 +3824,7 @@ dependencies = [
  "sha2",
  "smallvec",
  "sysinfo",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "triggered",
  "uuid 1.18.1",
@@ -3826,7 +3865,7 @@ dependencies = [
  "rand 0.8.5",
  "rocksdb",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3921,7 +3960,7 @@ dependencies = [
  "sha2",
  "slugify-rs",
  "sorted-insert",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -3960,7 +3999,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "sha2",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -4005,7 +4044,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "serde_repr",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
@@ -4074,7 +4113,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -4114,7 +4153,7 @@ dependencies = [
  "kaspa-rpc-macros",
  "kaspa-wrpc-server",
  "num_cpus",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "workflow-core",
  "workflow-log",
@@ -4141,7 +4180,7 @@ dependencies = [
  "paste",
  "rustls",
  "serde",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "workflow-core",
  "workflow-log",
@@ -4245,7 +4284,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "tempfile",
- "thiserror 1.0.64",
+ "thiserror 2.0.18",
  "tokio",
  "toml",
  "workflow-log",
@@ -5270,7 +5309,7 @@ version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77957b295656769bb8ad2b6a6b09d897d94f05c41b069aede1fcdaa675eaea04"
 dependencies = [
- "zerocopy",
+ "zerocopy 0.7.35",
 ]
 
 [[package]]
@@ -6243,6 +6282,12 @@ dependencies = [
  "cpufeatures",
  "digest",
 ]
+
+[[package]]
+name = "sha2-const-stable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9"
 
 [[package]]
 name = "sha3"
@@ -8137,7 +8182,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
 dependencies = [
  "byteorder",
- "zerocopy-derive",
+ "zerocopy-derive 0.7.35",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.8.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2578b716f8a7a858b7f02d5bd870c14bf4ddbbcf3a4c05414ba6503640505e3"
+dependencies = [
+ "zerocopy-derive 0.8.42",
 ]
 
 [[package]]
@@ -8145,6 +8199,17 @@ name = "zerocopy-derive"
 version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.110",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e6cc098ea4d3bd6246687de65af3f920c430e236bee1e3bf2e441463f08a02f"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -75,6 +75,11 @@ pub enum DatabaseStorePrefixes {
     UtxoIndexTips = 193,
     CirculatingSupply = 194,
 
+    // ---- SMT Versioned Store ----
+    SmtBranchVersions = 71,
+    SmtLaneVersions = 73,
+    SmtScoreIndex = 74,
+
     // ---- Separator ----
     /// Reserved as a separator
     Separator = SEPARATOR,
