@@ -2770,6 +2770,9 @@ version = "1.1.0"
 [[package]]
 name = "kaspa-atan-core"
 version = "1.1.0"
+dependencies = [
+ "kaspa-hashes",
+]
 
 [[package]]
 name = "kaspa-atan-data"
