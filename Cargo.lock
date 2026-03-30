@@ -2787,6 +2787,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "kaspa-atan-client"
+version = "1.1.0"
+
+[[package]]
+name = "kaspa-atan-core"
+version = "1.1.0"
+
+[[package]]
+name = "kaspa-atan-data"
+version = "1.1.0"
+
+[[package]]
+name = "kaspa-atan-server"
+version = "1.1.0"
+
+[[package]]
+name = "kaspa-atan-validation"
+version = "1.1.0"
+
+[[package]]
 name = "kaspa-bip32"
 version = "1.1.0"
 dependencies = [
