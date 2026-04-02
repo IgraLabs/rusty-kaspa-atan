@@ -1,7 +1,7 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::tx::Transaction;
 use kaspa_consensus_core::BlueWorkType;
+use kaspa_consensus_core::tx::Transaction;
 use kaspa_hashes::Hash;
 use kaspa_smt::proof::OwnedSmtProof;
 
@@ -145,10 +145,6 @@ pub struct TransactionWithMergeIndex {
 impl TransactionWithMergeIndex {
     /// Converts a `TransactionWithMergeIndex` into it's corresponding `ActivityDigest`
     pub fn activity_digest(&self) -> ActivityDigest {
-        ActivityDigest {
-            id: self.transaction.id(),
-            version: self.transaction.version,
-            merge_index: self.merge_index,
-        }
+        ActivityDigest { id: self.transaction.id(), version: self.transaction.version, merge_index: self.merge_index }
     }
 }
