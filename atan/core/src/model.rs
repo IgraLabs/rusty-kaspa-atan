@@ -37,7 +37,7 @@ pub struct ChainBlockBase {
     pub active_lanes_root: Hash,
 }
 
-/// Represents a chain block in an atan that doesn't keep any transaction data.
+/// Represents a chain block in an ATAN that doesn't keep any transaction data.
 /// Contains only the chain block's sequencing commitment, metadata and anything needed to prove its validity.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BareChainBlock {
@@ -45,7 +45,7 @@ pub struct BareChainBlock {
     pub base: ChainBlockBase,
 }
 
-/// Represents a chain block in an atan that only keeps transaction IDs.
+/// Represents a chain block in an ATAN that only keeps transaction IDs.
 /// Contains everything a `BareChainBlock` contains, as well as a list of ActivityDigests
 /// and the data needed to prove its validity.
 #[derive(Clone, Debug, PartialEq)]
@@ -62,7 +62,7 @@ pub struct ChainBlockWithTransactionIDs {
     pub lane_proof: Option<LaneActivityProof>,
 }
 
-/// Represents a chain block in an atan that only keeps full transaction data.
+/// Represents a chain block in an ATAN that only keeps full transaction data.
 /// Contains everything a `BareChainBlock` contains, as well as a list of transactions and
 /// the data needed to prove its validity.
 #[derive(Clone, Debug, PartialEq)]
