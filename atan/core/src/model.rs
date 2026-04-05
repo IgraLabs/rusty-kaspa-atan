@@ -1,7 +1,7 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::tx::Transaction;
 use kaspa_consensus_core::BlueWorkType;
+use kaspa_consensus_core::tx::Transaction;
 use kaspa_hashes::Hash;
 use kaspa_smt::proof::OwnedSmtProof;
 
@@ -62,8 +62,8 @@ pub struct ChainBlockWithTransactionIDs {
     pub lane_proof: Option<LaneActivityProof>,
 }
 
-/// Represents a chain block in an ATAN that only keeps full transaction data.
-/// Contains everything a `BareChainBlock` contains, as well as a list of transactions and
+/// Represents a chain block in an ATAN that keeps full transaction data.
+/// Contains everything a `BareChainBlock` does, as well as a list of transactions and
 /// the data needed to prove its validity.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChainBlockWithTransactions {
@@ -129,7 +129,7 @@ pub struct ActivityDigest {
 /// within a corresponding SequencingCommitment.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LaneActivityProof {
-    /// The blue score of the highest chain block that merged activity within this lane.
+    /// The blue score of the highest chain block that has merged transactions in this lane.
     last_touch_blue_score: u64,
     /// The SMT proof for this lane's payload within ActiveLanesRoot.
     proof: OwnedSmtProof,
