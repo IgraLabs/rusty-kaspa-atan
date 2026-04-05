@@ -1,7 +1,7 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::BlueWorkType;
 use kaspa_consensus_core::tx::Transaction;
+use kaspa_consensus_core::BlueWorkType;
 use kaspa_hashes::Hash;
 use kaspa_smt::proof::OwnedSmtProof;
 
@@ -14,6 +14,7 @@ use kaspa_smt::proof::OwnedSmtProof;
 /// 1. Bare - contains only the block's SequencingCommitment, metadata and anything needed to prove its validity
 /// 2. WithTransactionIDs - also contains the transaction ids and versions
 /// 3. WithTransactions - also contains the transactions themselves
+#[allow(dead_code)] // TODO: Remove this once this code is used
 enum ChainBlock {
     Bare(BareChainBlock),
     WithTransactionIDs(ChainBlockWithTransactionIDs),
@@ -79,6 +80,7 @@ pub struct ChainBlockWithTransactions {
 }
 impl ChainBlock {
     /// Returns the `ChainBlockBase` part of this ChainBlock
+    #[allow(dead_code)] // TODO: Remove this once this code is used
     pub fn base(&self) -> &ChainBlockBase {
         match self {
             ChainBlock::Bare(chain_block) => &chain_block.base,
