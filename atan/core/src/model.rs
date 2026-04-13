@@ -1,7 +1,7 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::BlueWorkType;
 use kaspa_consensus_core::tx::Transaction;
+use kaspa_consensus_core::BlueWorkType;
 use kaspa_hashes::Hash;
 use kaspa_smt::proof::OwnedSmtProof;
 
@@ -43,6 +43,8 @@ pub struct ChainBlockBase {
 pub struct BareChainBlock {
     /// The common fields all types of chain blocks contain.
     pub base: ChainBlockBase,
+    /// The ActiveLanesRoot field as defined by KIP-21.
+    pub active_lanes_root: Hash,
 }
 
 /// Represents a chain block in an ATAN that only keeps transaction IDs.
