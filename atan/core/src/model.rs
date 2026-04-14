@@ -135,6 +135,8 @@ pub struct LaneActivityProof {
     last_touch_blue_score: u64,
     /// The SMT proof for this lane's payload within ActiveLanesRoot.
     proof: OwnedSmtProof,
+    /// The ParentRef field as defined in KIP-21.
+    parent_ref: Hash,
 }
 
 /// Represents a transaction with its merge index.
