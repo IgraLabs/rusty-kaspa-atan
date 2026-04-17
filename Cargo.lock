@@ -2851,6 +2851,11 @@ version = "1.2.0-toc.2"
 [[package]]
 name = "kaspa-atan-validation"
 version = "1.2.0-toc.2"
+dependencies = [
+ "kaspa-atan-core",
+ "kaspa-hashes",
+ "kaspa-seq-commit",
+]
 
 [[package]]
 name = "kaspa-bip32"
@@ -3062,6 +3067,7 @@ dependencies = [
  "serde_yaml",
  "smallvec",
  "thiserror 2.0.18",
+ "tokio",
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-test",
