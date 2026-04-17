@@ -13,5 +13,7 @@ kaspa-smt.workspace = true
 kaspa-hashes.workspace = true
 kaspa-consensus-core.workspace = true
 
+thiserror.workspace = true
+
 [lints]
 workspace = true

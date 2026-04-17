@@ -2797,6 +2797,7 @@ dependencies = [
  "kaspa-consensus-core",
  "kaspa-hashes",
  "kaspa-smt",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
