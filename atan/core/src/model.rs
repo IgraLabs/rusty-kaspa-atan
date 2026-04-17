@@ -6,7 +6,7 @@ use kaspa_hashes::Hash;
 use kaspa_smt::proof::OwnedSmtProof;
 
 /// Represents a block in the selected parent chain.
-/// Including the MergeSetContext and all information required to prove the ChainBlock's validity,
+/// Including the MergesetContext and all information required to prove the ChainBlock's validity,
 /// assuming proper connection to a prior or consequent block.
 ///
 /// There are 3 types of chain blocks, a single ATAN will always keep only one of these types,
@@ -28,8 +28,8 @@ pub struct ChainBlockBase {
     pub block_hash: Hash,
     /// The sequencing commitment of the chain block as defined by KIP-21.
     pub sequencing_commitment: Hash,
-    /// The MergeSetContext of the chain block as defined by KIP-21
-    pub merge_set_context: MergeSetContext,
+    /// The MergesetContext of the chain block as defined by KIP-21
+    pub merge_set_context: MergesetContext,
     /// The fields consisting MinerPayloadRoot as defined by KIP-21.
     /// One `MinerPayload` per merged block, in merge order.
     pub miner_payloads: Vec<MinerPayload>,
@@ -92,10 +92,10 @@ impl ChainBlock {
     }
 }
 
-/// The MergeSetContext as defined in KIP-21.
+/// The MergesetContext as defined in KIP-21.
 /// Contains the consensus parameters of the ChainBlock that the Sequencing Commitment commits to.
 #[derive(Clone, Debug, PartialEq)]
-pub struct MergeSetContext {
+pub struct MergesetContext {
     /// The chain block's timestamp.
     pub timestamp: u64,
     /// The chain block's daa score.
