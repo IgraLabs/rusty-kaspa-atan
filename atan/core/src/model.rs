@@ -1,7 +1,7 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::tx::Transaction;
 use kaspa_consensus_core::BlueWorkType;
+use kaspa_consensus_core::tx::Transaction;
 use kaspa_hashes::Hash;
 use kaspa_smt::proof::OwnedSmtProof;
 
