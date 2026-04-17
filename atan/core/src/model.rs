@@ -15,7 +15,7 @@ use kaspa_smt::proof::OwnedSmtProof;
 /// 2. WithTransactionIDs - also contains the transaction ids and versions.
 /// 3. WithTransactions - also contains the transactions themselves.
 #[allow(dead_code)] // TODO: Remove this once this code is used
-enum ChainBlock {
+pub enum ChainBlock {
     Bare(BareChainBlock),
     WithTransactionIDs(ChainBlockWithTransactionIDs),
     WithTransactions(ChainBlockWithTransactions),
@@ -97,22 +97,22 @@ impl ChainBlock {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MergeSetContext {
     /// The chain block's timestamp.
-    timestamp: u64,
+    pub timestamp: u64,
     /// The chain block's daa score.
-    daa_score: u64,
+    pub daa_score: u64,
     /// The chain block's blue score.
-    blue_score: u64,
+    pub blue_score: u64,
 }
 
 /// The fields consisting MinerPayloadRoot as defined by KIP-21.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MinerPayload {
     /// The merged block's hash.
-    block_hash: Hash,
+    pub block_hash: Hash,
     /// The merged block's blue work.
-    blue_work: BlueWorkType,
+    pub blue_work: BlueWorkType,
     /// The merged block's coinbase transaction payload.
-    payload: Vec<u8>,
+    pub payload: Vec<u8>,
 }
 
 /// Represents the fields going into activity_digest as defined in KIP-21.
@@ -132,11 +132,11 @@ pub struct ActivityDigest {
 #[derive(Clone, Debug, PartialEq)]
 pub struct LaneActivityProof {
     /// The blue score of the highest chain block that has merged transactions in this lane.
-    last_touch_blue_score: u64,
+    pub last_touch_blue_score: u64,
     /// The SMT proof for this lane's payload within ActiveLanesRoot.
-    proof: OwnedSmtProof,
+    pub proof: OwnedSmtProof,
     /// The ParentRef field as defined in KIP-21.
-    parent_ref: Hash,
+    pub parent_ref: Hash,
 }
 
 /// Represents a transaction with its merge index.
