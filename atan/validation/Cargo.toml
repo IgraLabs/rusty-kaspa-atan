@@ -9,6 +9,9 @@ edition.workspace = true
 include.workspace = true
 
 [dependencies]
+kaspa-atan-core.workspace = true
+kaspa-hashes.workspace = true
+kaspa-seq-commit.workspace = true
 
 [lints]
 workspace = true
