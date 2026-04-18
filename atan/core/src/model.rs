@@ -124,7 +124,7 @@ pub struct ActivityDigest {
     /// The version of the transaction.
     pub version: u16,
     /// The merge_index of the transaction within the ChainBlock's merge set.
-    pub merge_index: u64,
+    pub merge_index: u32,
 }
 
 /// Contains all the data required to prove the validity of a list of `ActivityDigest`s
@@ -132,7 +132,7 @@ pub struct ActivityDigest {
 #[derive(Clone, Debug, PartialEq)]
 pub struct LaneActivityProof {
     /// The blue score of the highest chain block that has merged transactions in this lane.
-    pub last_touch_blue_score: u64,
+    pub last_touched_blue_score: u64,
     /// The SMT proof for this lane's payload within ActiveLanesRoot.
     pub proof: OwnedSmtProof,
     /// The ParentRef field as defined in KIP-21.
@@ -145,7 +145,7 @@ pub struct TransactionWithMergeIndex {
     /// The transaction.
     pub transaction: Transaction,
     /// The transaction's merge index.
-    pub merge_index: u64,
+    pub merge_index: u32,
 }
 
 impl TransactionWithMergeIndex {
