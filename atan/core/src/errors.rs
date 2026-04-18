@@ -1,5 +1,6 @@
 use crate::error_location::ErrorLocation;
 use kaspa_hashes::Hash;
+use kaspa_smt::proof::SmtProofError;
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 
@@ -17,6 +18,8 @@ pub enum AtanError {
 pub enum ValidationError {
     #[error("{2}: Invalid sequencing commitment: Expected: {0}, Actual: {1}")]
     InvalidSequencingCommitment(Expected<Hash>, Actual<Hash>, ErrorLocation),
+    #[error("{1}: The provided LaneSMTProof isn't valid: {0}")]
+    InvalidLaneSMTProof(SmtProofError, ErrorLocation),
 }
 
 #[derive(Error, Debug, Clone)]
