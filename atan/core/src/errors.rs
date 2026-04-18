@@ -1,22 +1,25 @@
 use crate::error_location::ErrorLocation;
 use kaspa_hashes::Hash;
 use std::fmt::{Debug, Display};
+use thiserror::Error;
 
 pub type AtanResult<T> = Result<T, AtanError>;
 
-#[derive(Debug, Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum AtanError {
+    #[error("Validation Error: {0}")]
     Validation(ValidationError),
+    #[error("System Error: {0}")]
     System(SystemError),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum ValidationError {
     #[error("{2}: Invalid sequencing commitment: Expected: {0}, Actual: {1}")]
     InvalidSequencingCommitment(Expected<Hash>, Actual<Hash>, ErrorLocation),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum SystemError {}
 
 /// Wraps the expected value in an error.
