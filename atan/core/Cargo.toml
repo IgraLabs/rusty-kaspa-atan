@@ -12,7 +12,9 @@ include.workspace = true
 kaspa-smt.workspace = true
 kaspa-hashes.workspace = true
 kaspa-consensus-core.workspace = true
+kaspa-seq-commit.workspace = true
 
+itertools.workspace = true
 thiserror.workspace = true
 
 [lints]
