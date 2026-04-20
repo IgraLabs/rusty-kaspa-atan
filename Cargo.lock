@@ -2794,8 +2794,10 @@ version = "1.1.0"
 name = "kaspa-atan-core"
 version = "1.1.0"
 dependencies = [
+ "itertools 0.13.0",
  "kaspa-consensus-core",
  "kaspa-hashes",
+ "kaspa-seq-commit",
  "kaspa-smt",
  "thiserror 2.0.18",
 ]
@@ -2815,6 +2817,7 @@ dependencies = [
  "kaspa-atan-core",
  "kaspa-hashes",
  "kaspa-seq-commit",
+ "kaspa-smt",
 ]
 
 [[package]]

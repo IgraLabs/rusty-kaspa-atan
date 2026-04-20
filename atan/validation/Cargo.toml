@@ -12,6 +12,7 @@ include.workspace = true
 kaspa-atan-core.workspace = true
 kaspa-hashes.workspace = true
 kaspa-seq-commit.workspace = true
+kaspa-smt.workspace = true
 
 [lints]
 workspace = true

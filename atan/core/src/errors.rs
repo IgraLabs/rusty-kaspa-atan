@@ -1,5 +1,5 @@
-use crate::error_location::ErrorLocation;
 use kaspa_hashes::Hash;
+use kaspa_seq_commit::types::LaneId;
 use kaspa_smt::proof::SmtProofError;
 use std::fmt::{Debug, Display};
 use thiserror::Error;
@@ -16,10 +16,16 @@ pub enum AtanError {
 
 #[derive(Error, Debug, Clone)]
 pub enum ValidationError {
-    #[error("{2}: Invalid sequencing commitment: Expected: {0}, Actual: {1}")]
-    InvalidSequencingCommitment(Expected<Hash>, Actual<Hash>, ErrorLocation),
-    #[error("{1}: The provided LaneSMTProof isn't valid: {0}")]
-    InvalidLaneSMTProof(SmtProofError, ErrorLocation),
+    #[error("Invalid sequencing commitment: Expected: {0}, Actual: {1}")]
+    InvalidSequencingCommitment(Expected<Hash>, Actual<Hash>),
+    #[error("The provided LaneSMTProof isn't valid: {0}")]
+    InvalidLaneSMTProof(SmtProofError),
+    #[error("Got 0 lanes in a ChainBlock")]
+    EmptyLanesWithActivityDigests,
+    #[error("Invalid laneID: Expected: {0}, Actual: {1}")]
+    InvalidLaneID(Expected<LaneId>, Actual<LaneId>),
+    #[error("ActiveLanesRoot doesn't match: For lane {0:?} it's {1}; For lane {2:?} it's {3}")]
+    UnmatchingActiveLanesRootForDifferentLanes(LaneId, Hash, LaneId, Hash),
 }
 
 #[derive(Error, Debug, Clone)]

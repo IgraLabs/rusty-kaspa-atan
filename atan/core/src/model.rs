@@ -1,8 +1,9 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::BlueWorkType;
 use kaspa_consensus_core::tx::Transaction;
+use kaspa_consensus_core::BlueWorkType;
 use kaspa_hashes::Hash;
+use kaspa_seq_commit::types::LaneId;
 use kaspa_smt::proof::OwnedSmtProof;
 
 /// Represents a block in the selected parent chain.
@@ -17,7 +18,7 @@ use kaspa_smt::proof::OwnedSmtProof;
 #[allow(dead_code)] // TODO: Remove this once this code is used
 pub enum ChainBlock {
     Bare(BareChainBlock),
-    WithTransactionIDs(ChainBlockWithTransactionIDs),
+    WithTransactionIDs(ChainBlockWithActivityDigests),
     WithTransactions(ChainBlockWithTransactions),
 }
 
@@ -47,21 +48,44 @@ pub struct BareChainBlock {
     pub active_lanes_root: Hash,
 }
 
+/// Contains the transaction activity (ActivityDigest only, no full transactions) in a single lane
+/// in a single chain block as well as the data required to prove its validity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LaneActivityDigestsWithProof {
+    /// The ID of this lane
+    pub lane_id: LaneId,
+    /// A list of ActivityDigests merged in this ChainBlock in this lane.
+    pub activity_digests: Vec<ActivityDigest>,
+    /// All information required to prove that the `activity_digests` list corresponds to the
+    /// stated `sequencing_commitment`.
+    pub lane_proof: LaneActivityProof,
+}
+
 /// Represents a chain block in an ATAN that only keeps transaction IDs.
 /// Contains everything a `BareChainBlock` contains, as well as a list of ActivityDigests
 /// and the data needed to prove its validity.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ChainBlockWithTransactionIDs {
+pub struct ChainBlockWithActivityDigests {
     /// The common fields all types of chain blocks contain.
     pub base: ChainBlockBase,
-    /// List of the transaction IDs accepted by this chain block.
-    /// If this ATAN holds a single lane, only transaction IDs of active lane will be included.
-    /// If this ATAN holds all lanes, all accepted transactions will be included.
-    pub activity_digests: Vec<ActivityDigest>,
-    /// All information required to prove that the `transaction_ids` list corresponds to the
+    /// List of the activity digests merged by this chain block, grouped by LaneId, including proofs for their validity.
+    /// To keep order intact this is a Vec of structs rather than a HashMap.
+    /// If this ATAN holds a single lane, a single entry with the activity digests of the selected lane will be included.
+    /// If this ATAN holds all lanes, all accepted transactions will be included, with one entry per lane with activity.
+    pub activity_digests_with_proofs: Vec<LaneActivityDigestsWithProof>,
+}
+
+/// Contains the transaction activity (including the full transactions) in a single lane
+/// in a single chain block as well as the data required to prove its validity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LaneTransactionsWithProof {
+    /// The ID of this lane
+    pub lane_id: LaneId,
+    /// A list of Transactions merged in this ChainBlock in this lane.
+    pub transactions: Vec<TransactionWithMergeIndex>,
+    /// All information required to prove that the `transactions` list corresponds to the
     /// stated `sequencing_commitment`.
-    /// Will be `None` if this ATAN keeps all lanes.
-    pub lane_proof: Option<LaneActivityProof>,
+    pub lane_proof: LaneActivityProof,
 }
 
 /// Represents a chain block in an ATAN that keeps full transaction data.
@@ -71,24 +95,35 @@ pub struct ChainBlockWithTransactionIDs {
 pub struct ChainBlockWithTransactions {
     /// The common fields all types of chain blocks contain.
     pub base: ChainBlockBase,
-    /// List of the transaction accepted by this chain block.
-    /// If this ATAN holds a single lane, only transaction of active lane will be included.
-    /// If this ATAN holds all lanes, all accepted transactions will be included.
-    pub transactions: Vec<TransactionWithMergeIndex>,
-    /// All information required to prove that the `transactions` list corresponds to the
-    /// stated `sequencing_commitment`
-    /// Will be None if this ATAN keeps all lanes.
-    pub lane_proof: Option<LaneActivityProof>,
+    /// List of the transaction merged by this chain block, grouped by LaneId, including proofs for their validity.
+    /// To keep order intact this is a Vec of structs rather than a HashMap.
+    /// If this ATAN holds a single lane, a single entry with the transactions of the selected lane will be included.
+    /// If this ATAN holds all lanes, all accepted transactions will be included, with one entry per lane with activity.
+    pub transactions_with_proofs: Vec<LaneTransactionsWithProof>,
 }
 impl ChainBlock {
     /// Returns the `ChainBlockBase` part of this ChainBlock.
-    #[allow(dead_code)] // TODO: Remove this once this code is used
     pub fn base(&self) -> &ChainBlockBase {
         match self {
             ChainBlock::Bare(chain_block) => &chain_block.base,
             ChainBlock::WithTransactionIDs(chain_block) => &chain_block.base,
             ChainBlock::WithTransactions(chain_block) => &chain_block.base,
         }
+    }
+}
+
+impl LaneTransactionsWithProof {
+    pub fn to_activity_digests(&self) -> LaneActivityDigestsWithProof {
+        LaneActivityDigestsWithProof {
+            lane_id: self.lane_id,
+            activity_digests: self.transactions.iter().map(|transaction| transaction.activity_digest()).collect(),
+            lane_proof: self.lane_proof.clone(),
+        }
+    }
+}
+impl ChainBlockWithTransactions {
+    pub fn activity_digests_with_proofs(&self) -> Vec<LaneActivityDigestsWithProof> {
+        self.transactions_with_proofs.iter().map(|lane_transactions| lane_transactions.to_activity_digests()).collect()
     }
 }
 
@@ -133,10 +168,10 @@ pub struct ActivityDigest {
 pub struct LaneActivityProof {
     /// The blue score of the highest chain block that has merged transactions in this lane.
     pub last_touched_blue_score: u64,
-    /// The SMT proof for this lane's payload within ActiveLanesRoot.
-    pub proof: OwnedSmtProof,
     /// The ParentRef field as defined in KIP-21.
     pub parent_ref: Hash,
+    /// The SMT proof for this lane's payload within ActiveLanesRoot.
+    pub smt_proof: OwnedSmtProof,
 }
 
 /// Represents a transaction with its merge index.
