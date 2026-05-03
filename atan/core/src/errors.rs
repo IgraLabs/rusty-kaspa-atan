@@ -22,15 +22,17 @@ pub enum ValidationError {
     InvalidLaneSMTProof(SmtProofError),
     #[error("Got 0 lanes in a ChainBlock")]
     EmptyLanesWithActivityDigests,
+    #[error("Got {0} lanes in a ChainBlock, when 1 is expected")]
+    InvalidNumberOfLanesWithActivityDigests(Actual<usize>),
     #[error("Invalid laneID: Expected: {0}, Actual: {1}")]
     InvalidLaneID(Expected<LaneId>, Actual<LaneId>),
     #[error("ActiveLanesRoot doesn't match: For lane {0:?} it's {1}; For lane {2:?} it's {3}")]
     UnmatchingActiveLanesRootForDifferentLanes(LaneId, Hash, LaneId, Hash),
-    #[error(
-        "Recent block invalid because it doesn't connect to existing chain: Expected selected parent sequencing commitment: {0}. Actual: {1}"
+    #[error("Recent block invalid because it doesn't connect to existing chain: Expected selected parent sequencing commitment: {0}. Actual: {1}"
     )]
     RecentBlockDoesntConnect(Expected<Hash>, Actual<Hash>),
-    #[error("Historical block invalid because it doesn't connect to existing chain: Expected sequencing commitment: {0}. Actual: {1}")]
+    #[error("Historical block invalid because it doesn't connect to existing chain: Expected sequencing commitment: {0}. Actual: {1}"
+    )]
     HistoricalBlockDoesntConnect(Expected<Hash>, Actual<Hash>),
 }
 
