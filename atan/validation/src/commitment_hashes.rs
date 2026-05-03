@@ -33,7 +33,7 @@ impl AtanValidator {
     fn calculate_active_lanes_root(&self, chain_block: &ChainBlock, mergeset_context_hash: &Hash) -> AtanResult<Hash> {
         let activity_digests_with_proofs = match chain_block {
             ChainBlock::Bare(cb) => return Ok(cb.active_lanes_root),
-            ChainBlock::WithTransactionIDs(cb) => &cb.activity_digests_with_proofs,
+            ChainBlock::WithActivityDigest(cb) => &cb.activity_digests_with_proofs,
             ChainBlock::WithTransactions(cb) => &cb.activity_digests_with_proofs(),
         };
 

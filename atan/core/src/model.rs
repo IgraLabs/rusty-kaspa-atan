@@ -18,7 +18,7 @@ use kaspa_smt::proof::OwnedSmtProof;
 #[allow(dead_code)] // TODO: Remove this once this code is used
 pub enum ChainBlock {
     Bare(BareChainBlock),
-    WithTransactionIDs(ChainBlockWithActivityDigests),
+    WithActivityDigest(ChainBlockWithActivityDigests),
     WithTransactions(ChainBlockWithTransactions),
 }
 
@@ -106,7 +106,7 @@ impl ChainBlock {
     pub fn base(&self) -> &ChainBlockBase {
         match self {
             ChainBlock::Bare(chain_block) => &chain_block.base,
-            ChainBlock::WithTransactionIDs(chain_block) => &chain_block.base,
+            ChainBlock::WithActivityDigest(chain_block) => &chain_block.base,
             ChainBlock::WithTransactions(chain_block) => &chain_block.base,
         }
     }
