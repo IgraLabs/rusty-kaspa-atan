@@ -1,4 +1,4 @@
-use crate::validate_chain_block::AtanValidator;
+use crate::atan_validator::AtanValidator;
 use kaspa_atan_core::errors::AtanError::Validation;
 use kaspa_atan_core::errors::ValidationError::{
     EmptyLanesWithActivityDigests, InvalidLaneID, InvalidLaneSMTProof, UnmatchingActiveLanesRootForDifferentLanes,
@@ -14,7 +14,11 @@ use kaspa_seq_commit::types::{
     LaneTipInput, MergesetContext as SeqCommitMergesetContext, MinerPayloadLeafInput, SeqCommitInput, SeqState, SmtLeafInput,
 };
 
-impl AtanValidator {
+impl<F, G> AtanValidator<F, G>
+where
+    F: Fn() -> Hash,
+    G: Fn() -> Hash,
+{
     pub(crate) fn calculate_sequencing_commitment(&self, chain_block: &ChainBlock) -> AtanResult<Hash> {
         let mergeset_context_hash = &chain_block.base().merge_set_context.hash();
         let miner_payload_root = &chain_block.base().miner_payloads.root();
