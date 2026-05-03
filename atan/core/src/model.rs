@@ -1,7 +1,7 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::tx::Transaction;
 use kaspa_consensus_core::BlueWorkType;
+use kaspa_consensus_core::tx::Transaction;
 use kaspa_hashes::Hash;
 use kaspa_seq_commit::types::LaneId;
 use kaspa_smt::proof::OwnedSmtProof;
@@ -29,6 +29,8 @@ pub struct ChainBlockBase {
     pub block_hash: Hash,
     /// The sequencing commitment of the chain block as defined by KIP-21.
     pub sequencing_commitment: Hash,
+    /// The sequencing commitment of the chain block's selected parent.
+    pub selected_parent_sequencing_commitment: Hash,
     /// The MergesetContext of the chain block as defined by KIP-21
     pub merge_set_context: MergesetContext,
     /// The fields consisting MinerPayloadRoot as defined by KIP-21.
