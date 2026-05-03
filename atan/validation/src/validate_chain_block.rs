@@ -29,16 +29,26 @@ impl AtanValidator {
     /// * `chain_block` - the ChainBlock to validate.
     /// * `selected_parent_sequencing_commitment` - the SequencingCommitment field for this ChainBlock's selected parent
     ///
+    /// Validation Steps:
+    /// 1. Calculate the expected sequencing commitment according to block data and selected parent
+    ///    sequencing commitment:
+    /// 1.1.
+    ///
+    /// 2. Validate that the expected sequencing commitment equals the stated sequencing commitment
+    ///
+    ///
     /// # Returns
     /// * `Ok(())` if the block is valid
     ///
     /// # Errors
     /// `AtanError::Validation(_)` - If any of the validation steps fail.
     pub fn validate_chain_block(&self, chain_block: &ChainBlock, selected_parent_sequencing_commitment: &Hash) -> AtanResult<()> {
+        // 1. Calculate the expected sequencing commitment according to block data and selected parent
+        //    sequencing commitment:
         let expected_sequencing_commitment = self.calculate_sequencing_commitment(chain_block, selected_parent_sequencing_commitment)?;
 
+        // 2. Validate that the expected sequencing commitment equals the stated sequencing commitment
         let actual_sequencing_commitment = chain_block.base().sequencing_commitment;
-
         if actual_sequencing_commitment != expected_sequencing_commitment {
             Err(Validation(InvalidSequencingCommitment(
                 Expected(expected_sequencing_commitment),
