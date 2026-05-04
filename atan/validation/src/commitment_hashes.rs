@@ -17,8 +17,8 @@ use kaspa_seq_commit::types::{
 
 impl<F, G> AtanValidator<F, G>
 where
-    F: Fn() -> Hash,
-    G: Fn() -> Hash,
+    F: Fn() -> ChainBlock,
+    G: Fn() -> ChainBlock,
 {
     /// Calculates the expected sequencing commitment for the given ChainBlock according to KIP-21.
     ///
