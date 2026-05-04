@@ -1,6 +1,9 @@
 use crate::atan_validator::AtanValidator;
 use kaspa_atan_core::errors::AtanError::Validation;
-use kaspa_atan_core::errors::ValidationError::{EmptyLanesWithActivityDigests, InvalidLaneID, InvalidLaneSMTProof, InvalidNumberOfLanesWithActivityDigests, UnmatchingActiveLanesRootForDifferentLanes};
+use kaspa_atan_core::errors::ValidationError::{
+    EmptyLanesWithActivityDigests, InvalidLaneID, InvalidLaneSMTProof, InvalidNumberOfLanesWithActivityDigests,
+    UnmatchingActiveLanesRootForDifferentLanes,
+};
 use kaspa_atan_core::errors::{Actual, AtanResult, Expected};
 use kaspa_atan_core::model::{ActivityDigest, ChainBlock, LaneActivityDigestsWithProof, MergesetContext, MinerPayload};
 use kaspa_hashes::{Hash, SeqCommitActiveNode};
@@ -17,6 +20,17 @@ where
     F: Fn() -> Hash,
     G: Fn() -> Hash,
 {
+    /// Calculates the expected sequencing commitment for the given ChainBlock according to KIP-21.
+    ///
+    /// # Arguments
+    /// * `chain_block` - the ChainBlock whose sequencing commitment is being calculated.
+    ///
+    /// # Returns
+    /// * `Ok(Hash)` - the calculated sequencing commitment.
+    ///
+    /// # Errors
+    /// * `AtanError::Validation(_)` - If the ChainBlock has missing lane activity or the proofs don't
+    ///     create the same active_lanes_root throughout the lanes.
     pub(crate) fn calculate_sequencing_commitment(&self, chain_block: &ChainBlock) -> AtanResult<Hash> {
         //     3.1. Calculate MergeSetContextHash, MinerPayloadRoot, combine them to StateRoot.
         let mergeset_context_hash = &chain_block.base().merge_set_context.hash();
@@ -69,7 +83,7 @@ where
         // 3.2.4. If this is an all-lane ATAN - calculate the ActiveLanesRoot for the rest of the lanes:
         for lane in lanes_iter {
             let active_lanes_root = calculate_active_lanes_root_for_lane(lane, mergeset_context_hash)?;
-            // 3.2.4.1 Validate that ActiveLanesRoot for all lanes are equal.
+            // 3.2.4.1. Validate that ActiveLanesRoot for all lanes are equal.
             if active_lanes_root != first_lane_active_lanes_root {
                 return Err(Validation(UnmatchingActiveLanesRootForDifferentLanes(
                     first_lane.lane_id,
@@ -90,7 +104,7 @@ fn calculate_active_lanes_root_for_lane(
 ) -> AtanResult<Hash> {
     let proof = &lane_activity_digests_with_proof.lane_proof;
 
-    // 3.2.3.1. Calculate LaneTip, combine with LaneKey and LastTouchedBlueScore to get LanePayload
+    // 3.2.3.1. Calculate LaneTip, combine with LaneKey and LastTouchedBlueScore to get LanePayload.
     let lane_key = &lane_key(&lane_activity_digests_with_proof.lane_id);
     let lane_tip = &lane_tip_next(&LaneTipInput {
         parent_ref: &proof.parent_ref,
@@ -100,7 +114,7 @@ fn calculate_active_lanes_root_for_lane(
     });
     let lane_payload = smt_leaf_hash(&SmtLeafInput { lane_key, lane_tip, blue_score: proof.last_touched_blue_score });
 
-    // 3.2.3.2. Apply the SmtProof to get ActiveLanesRoot
+    // 3.2.3.2. Apply the SmtProof to get ActiveLanesRoot.
     proof.smt_proof.compute_root::<SeqCommitActiveNode>(lane_key, Some(lane_payload)).map_err(|e| Validation(InvalidLaneSMTProof(e)))
 }
 
