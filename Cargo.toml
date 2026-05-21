@@ -150,6 +150,13 @@ kaspa-wrpc-example-subscriber = { version = "1.2.0-toc.2", path = "rpc/wrpc/exam
 kaspad = { version = "1.2.0-toc.2", path = "kaspad" }
 kaspa-alloc = { version = "1.2.0-toc.2", path = "utils/alloc" }
 
+# atan
+kaspa-atan-client = { version = "1.2.0-toc.2", path = "atan/client" }
+kaspa-atan-core = { version = "1.2.0-toc.2", path = "atan/core" }
+kaspa-atan-data = { version = "1.2.0-toc.2", path = "atan/data" }
+kaspa-atan-server = { version = "1.2.0-toc.2", path = "atan/server" }
+kaspa-atan-validation = { version = "1.2.0-toc.2", path = "atan/validation" }
+
 # external
 aes = "0.8.3"
 ahash = "0.8.6"
@@ -243,8 +250,8 @@ rand_distr = "0.4.3"
 rayon = "1.8.0"
 regex = "1.10.2"
 risc0-groth16 = "3.0.3"
-risc0-circuit-recursion = { version="4.0.3", default-features=false }
-risc0-circuit-keccak =  { version="4.0.3", default-features=false }
+risc0-circuit-recursion = { version = "4.0.3", default-features = false }
+risc0-circuit-keccak = { version = "4.0.3", default-features = false }
 risc0-zkp = "3.0.3"
 risc0-core = "3.0.0"
 risc0-binfmt = "3.0.3"
@@ -305,7 +312,7 @@ indexed_db_futures = "0.5.0"
 # workflow dependencies that are not a part of core libraries
 
 # workflow-perf-monitor = { path = "../../../workflow-perf-monitor-rs" }
-workflow-perf-monitor = { git='https://github.com/kaspanet/workflow-perf-monitor-rs.git', tag = "v0.0.3" }
+workflow-perf-monitor = { git = 'https://github.com/kaspanet/workflow-perf-monitor-rs.git', tag = "v0.0.3" }
 nw-sys = "0.1.6"
 rustls = { version = "0.23.18", default-features = false, features = ["ring"] }
 
