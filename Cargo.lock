@@ -3071,7 +3071,6 @@ dependencies = [
  "serde_yaml",
  "smallvec",
  "thiserror 2.0.18",
- "tokio",
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-test",

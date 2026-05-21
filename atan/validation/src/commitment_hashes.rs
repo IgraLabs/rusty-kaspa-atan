@@ -9,7 +9,7 @@ use kaspa_atan_core::model::{ActivityDigest, ChainBlock, LaneActivityDigestsWith
 use kaspa_hashes::{Hash, SeqCommitActiveNode};
 use kaspa_seq_commit::hashing::{
     activity_digest_lane, activity_leaf, lane_key, lane_tip_next, mergeset_context_hash, miner_payload_leaf, miner_payload_root,
-    payload_and_context_digest, seq_commit, seq_commit_tx_digest, seq_state_root, smt_leaf_hash,
+    payload_and_context_digest, seq_commit, seq_state_root, smt_leaf_hash,
 };
 use kaspa_seq_commit::types::{
     LaneTipInput, MergesetContext as SeqCommitMergesetContext, MinerPayloadLeafInput, SeqCommitInput, SeqState, SmtLeafInput,
@@ -112,7 +112,7 @@ fn calculate_active_lanes_root_for_lane(
         activity_digest: &lane_activity_digests_with_proof.activity_digests.root(),
         context_hash: mergeset_context_hash,
     });
-    let lane_payload = smt_leaf_hash(&SmtLeafInput { lane_key, lane_tip, blue_score: proof.last_touched_blue_score });
+    let lane_payload = smt_leaf_hash(&SmtLeafInput { lane_tip, blue_score: proof.last_touched_blue_score });
 
     // 3.2.3.2. Apply the SmtProof to get ActiveLanesRoot.
     proof.smt_proof.compute_root::<SeqCommitActiveNode>(lane_key, Some(lane_payload)).map_err(|e| Validation(InvalidLaneSMTProof(e)))
@@ -138,9 +138,9 @@ impl Hasher for MergesetContext {
 impl Rooter for Vec<MinerPayload> {
     fn root(&self) -> Hash {
         let payload_leaves = self.iter().map(|miner_payload| {
-            miner_payload_leaf(&MinerPayloadLeafInput {
+            miner_payload_leaf(MinerPayloadLeafInput {
                 block_hash: &miner_payload.block_hash,
-                blue_work_bytes: &miner_payload.blue_work.to_le_bytes(),
+                blue_work_be_bytes: &miner_payload.blue_work.to_be_bytes(),
                 payload: &miner_payload.payload,
             })
         });
@@ -152,8 +152,7 @@ impl Rooter for Vec<MinerPayload> {
 impl Rooter for Vec<ActivityDigest> {
     fn root(&self) -> Hash {
         let activity_leaves = self.iter().map(|activity_digest| {
-            let transaction_digest = seq_commit_tx_digest(&activity_digest.id, activity_digest.version);
-            activity_leaf(&transaction_digest, activity_digest.merge_index)
+            activity_leaf(&activity_digest.id, activity_digest.version, activity_digest.merge_index)
         });
 
         activity_digest_lane(activity_leaves)
