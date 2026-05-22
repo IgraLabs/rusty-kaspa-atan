@@ -2835,7 +2835,6 @@ version = "1.2.0-toc.2"
 name = "kaspa-atan-core"
 version = "1.2.0-toc.2"
 dependencies = [
- "itertools 0.13.0",
  "kaspa-consensus-core",
  "kaspa-hashes",
  "kaspa-seq-commit",
