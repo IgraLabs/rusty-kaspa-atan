@@ -57,13 +57,7 @@ where
     pub fn new(lane_id: Option<LaneId>, get_chain_tip_callback: F, get_chain_sink_callback: G) -> Self {
         Self { lane_id, get_chain_tip_callback, get_chain_sink_callback }
     }
-}
 
-impl<F, G> AtanValidator<F, G>
-where
-    F: Fn() -> ChainBlock,
-    G: Fn() -> ChainBlock,
-{
     /// Validates a recent ChainBlock, and makes sure it connects to the existing chain from above.
     ///
     /// # Arguments

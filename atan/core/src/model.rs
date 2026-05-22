@@ -15,7 +15,6 @@ use kaspa_smt::proof::OwnedSmtProof;
 /// 1. Bare - contains only the block's SequencingCommitment, metadata and anything needed to prove its validity.
 /// 2. WithTransactionIDs - also contains the transaction ids and versions.
 /// 3. WithTransactions - also contains the transactions themselves.
-#[allow(dead_code)] // TODO: Remove this once this code is used
 pub enum ChainBlock {
     Bare(BareChainBlock),
     WithActivityDigest(ChainBlockWithActivityDigests),
