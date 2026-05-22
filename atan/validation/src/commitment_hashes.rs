@@ -59,19 +59,16 @@ where
             ChainBlock::WithTransactions(cb) => &cb.activity_digests_with_proofs(),
         };
 
+        // 3.2.2.1. If this is a single-lane ATAN - Validate there's exactly 1 lane with the correct ID.
+        // 3.2.2.2. If this is an all-lane ATAN - Validate there is at least 1 lane.
+        let (first_lane, rest_of_lanes) = activity_digests_with_proofs.split_first().ok_or(Validation(EmptyLanesWithActivityDigests))?;
         if let Some(expected_lane_id) = self.lane_id {
-            // 3.2.2.1. If this is a single-lane ATAN - Validate there's exactly 1 lane with the correct ID.
-            if activity_digests_with_proofs.len() != 1 {
+            if !rest_of_lanes.is_empty() {
                 return Err(Validation(InvalidNumberOfLanesWithActivityDigests(Actual(activity_digests_with_proofs.len()))));
             }
-            let actual_lane_id = activity_digests_with_proofs[0].lane_id;
+            let actual_lane_id = first_lane.lane_id;
             if actual_lane_id != expected_lane_id {
                 return Err(Validation(InvalidLaneID(Expected(expected_lane_id), Actual(actual_lane_id))));
-            }
-        } else {
-            // 3.2.2.2. If this is an all-lane ATAN - Validate there is at least 1 lane.
-            if activity_digests_with_proofs.is_empty() {
-                return Err(Validation(EmptyLanesWithActivityDigests));
             }
         }
 
