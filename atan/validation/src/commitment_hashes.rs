@@ -55,7 +55,7 @@ where
         // 3.2.2. Get a two-dimensional vector of ActivityDigests with respective proofs - one vector per lane.
         let activity_digests_with_proofs = match chain_block {
             ChainBlock::Bare(cb) => return Ok(cb.active_lanes_root), // 3.2.1. If this ATAN keeps bare blocks - ActiveLanesRoot is stored in the block.
-            ChainBlock::WithActivityDigest(cb) => &cb.activity_digests_with_proofs,
+            ChainBlock::WithActivityDigests(cb) => &cb.activity_digests_with_proofs,
             ChainBlock::WithTransactions(cb) => &cb.activity_digests_with_proofs(),
         };
 
