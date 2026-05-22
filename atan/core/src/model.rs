@@ -1,7 +1,7 @@
 //! Defines the various types present in the ATAN API.
 
-use kaspa_consensus_core::BlueWorkType;
 use kaspa_consensus_core::tx::Transaction;
+use kaspa_consensus_core::BlueWorkType;
 use kaspa_hashes::Hash;
 use kaspa_seq_commit::types::LaneId;
 use kaspa_smt::proof::OwnedSmtProof;
@@ -36,8 +36,6 @@ pub struct ChainBlockBase {
     /// The fields consisting MinerPayloadRoot as defined by KIP-21.
     /// One `MinerPayload` per merged block, in merge order.
     pub miner_payloads: Vec<MinerPayload>,
-    /// The ActiveLanesRoot as defined by KIP-21.
-    pub active_lanes_root: Hash,
 }
 
 /// Represents a chain block in an ATAN that doesn't keep any transaction data.
