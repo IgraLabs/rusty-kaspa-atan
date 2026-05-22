@@ -33,15 +33,15 @@ where
     ///     create the same active_lanes_root throughout the lanes.
     pub(crate) fn calculate_sequencing_commitment(&self, chain_block: &ChainBlock) -> AtanResult<Hash> {
         //     3.1. Calculate MergeSetContextHash, MinerPayloadRoot, combine them to StateRoot.
-        let mergeset_context_hash = &chain_block.base().merge_set_context.hash();
-        let miner_payload_root = &chain_block.base().miner_payloads.root();
-        let state_root = &payload_and_context_digest(mergeset_context_hash, miner_payload_root);
+        let mergeset_context_hash = chain_block.base().merge_set_context.hash();
+        let miner_payload_root = chain_block.base().miner_payloads.root();
+        let state_root = payload_and_context_digest(&mergeset_context_hash, &miner_payload_root);
 
         //     3.2. Calculate ActiveLanesRoot:
-        let active_lanes_root = &self.calculate_active_lanes_root(chain_block, mergeset_context_hash)?;
+        let active_lanes_root = &self.calculate_active_lanes_root(chain_block, &mergeset_context_hash)?;
 
         //     3.3. Combine StateRoot and ActiveLanesRoot to get SeqStateRoot.
-        let sequencing_state_root = &seq_state_root(&SeqState { lanes_root: active_lanes_root, payload_and_ctx_digest: state_root });
+        let sequencing_state_root = &seq_state_root(&SeqState { lanes_root: active_lanes_root, payload_and_ctx_digest: &state_root });
         //     3.4. Combine SeqStateRoot with SelectedParent.SequencingCommitment to get current block's sequencing commitment.
         let sequencing_commitment = seq_commit(&SeqCommitInput {
             parent_seq_commit: &chain_block.base().selected_parent_sequencing_commitment,
@@ -61,8 +61,7 @@ where
 
         // 3.2.2.1. If this is a single-lane ATAN - Validate there's exactly 1 lane with the correct ID.
         // 3.2.2.2. If this is an all-lane ATAN - Validate there is at least 1 lane.
-        let (first_lane, rest_of_lanes) =
-            activity_digests_with_proofs.split_first().ok_or(Validation(EmptyLanesWithActivityDigests))?;
+        let (first_lane, rest_of_lanes) = activity_digests_with_proofs.split_first().ok_or(Validation(EmptyLanesWithActivityDigests))?;
         if let Some(expected_lane_id) = self.lane_id {
             if !rest_of_lanes.is_empty() {
                 return Err(Validation(InvalidNumberOfLanesWithActivityDigests(Actual(activity_digests_with_proofs.len()))));
@@ -149,9 +148,7 @@ impl Rooter for Vec<MinerPayload> {
 
 impl Rooter for Vec<ActivityDigest> {
     fn root(&self) -> Hash {
-        let activity_leaves = self
-            .iter()
-            .map(|activity_digest| activity_leaf(&activity_digest.id, activity_digest.version, activity_digest.merge_index));
+        let activity_leaves = self.iter().map(|activity_digest| activity_leaf(&activity_digest.id, activity_digest.version, activity_digest.merge_index));
 
         activity_digest_lane(activity_leaves)
     }
