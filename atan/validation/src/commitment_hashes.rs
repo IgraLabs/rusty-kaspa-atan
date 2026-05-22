@@ -61,7 +61,8 @@ where
 
         // 3.2.2.1. If this is a single-lane ATAN - Validate there's exactly 1 lane with the correct ID.
         // 3.2.2.2. If this is an all-lane ATAN - Validate there is at least 1 lane.
-        let (first_lane, rest_of_lanes) = activity_digests_with_proofs.split_first().ok_or(Validation(EmptyLanesWithActivityDigests))?;
+        let (first_lane, rest_of_lanes) =
+            activity_digests_with_proofs.split_first().ok_or(Validation(EmptyLanesWithActivityDigests))?;
         if let Some(expected_lane_id) = self.lane_id {
             if !rest_of_lanes.is_empty() {
                 return Err(Validation(InvalidNumberOfLanesWithActivityDigests(Actual(activity_digests_with_proofs.len()))));
@@ -148,9 +149,9 @@ impl Rooter for Vec<MinerPayload> {
 
 impl Rooter for Vec<ActivityDigest> {
     fn root(&self) -> Hash {
-        let activity_leaves = self.iter().map(|activity_digest| {
-            activity_leaf(&activity_digest.id, activity_digest.version, activity_digest.merge_index)
-        });
+        let activity_leaves = self
+            .iter()
+            .map(|activity_digest| activity_leaf(&activity_digest.id, activity_digest.version, activity_digest.merge_index));
 
         activity_digest_lane(activity_leaves)
     }
