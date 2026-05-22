@@ -28,11 +28,11 @@ pub enum ValidationError {
     InvalidLaneID(Expected<LaneId>, Actual<LaneId>),
     #[error("ActiveLanesRoot doesn't match: For lane {0:?} it's {1}; For lane {2:?} it's {3}")]
     UnmatchingActiveLanesRootForDifferentLanes(LaneId, Hash, LaneId, Hash),
-    #[error(
-        "Recent block invalid because it doesn't connect to existing chain: Expected selected parent sequencing commitment: {0}. Actual: {1}"
+    #[error("Recent block invalid because it doesn't connect to existing chain: Expected selected parent sequencing commitment: {0}. Actual: {1}"
     )]
     RecentBlockDoesntConnect(Expected<Hash>, Actual<Hash>),
-    #[error("Historical block invalid because it doesn't connect to existing chain: Expected sequencing commitment: {0}. Actual: {1}")]
+    #[error("Historical block invalid because it doesn't connect to existing chain: Expected sequencing commitment: {0}. Actual: {1}"
+    )]
     HistoricalBlockDoesntConnect(Expected<Hash>, Actual<Hash>),
 }
 
@@ -49,13 +49,13 @@ pub struct Actual<T>(pub T);
 
 impl<T: Debug> Display for Actual<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Actual: {:?}", self.0)
+        write!(f, "{:?}", self.0)
     }
 }
 
 impl<T: Debug> Display for Expected<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Expected: {:?}", self.0)
+        write!(f, "{:?}", self.0)
     }
 }
 
