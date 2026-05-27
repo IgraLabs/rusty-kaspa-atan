@@ -49,13 +49,13 @@ pub struct Actual<T>(pub T);
 
 impl<T: Debug> Display for Actual<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Actual: {:?}", self.0)
+        write!(f, "{:?}", self.0)
     }
 }
 
 impl<T: Debug> Display for Expected<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Expected: {:?}", self.0)
+        write!(f, "{:?}", self.0)
     }
 }
 

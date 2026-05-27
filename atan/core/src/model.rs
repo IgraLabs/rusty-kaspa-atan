@@ -15,10 +15,9 @@ use kaspa_smt::proof::OwnedSmtProof;
 /// 1. Bare - contains only the block's SequencingCommitment, metadata and anything needed to prove its validity.
 /// 2. WithTransactionIDs - also contains the transaction ids and versions.
 /// 3. WithTransactions - also contains the transactions themselves.
-#[allow(dead_code)] // TODO: Remove this once this code is used
 pub enum ChainBlock {
     Bare(BareChainBlock),
-    WithActivityDigest(ChainBlockWithActivityDigests),
+    WithActivityDigests(ChainBlockWithActivityDigests),
     WithTransactions(ChainBlockWithTransactions),
 }
 
@@ -36,8 +35,6 @@ pub struct ChainBlockBase {
     /// The fields consisting MinerPayloadRoot as defined by KIP-21.
     /// One `MinerPayload` per merged block, in merge order.
     pub miner_payloads: Vec<MinerPayload>,
-    /// The ActiveLanesRoot as defined by KIP-21.
-    pub active_lanes_root: Hash,
 }
 
 /// Represents a chain block in an ATAN that doesn't keep any transaction data.
@@ -73,7 +70,7 @@ pub struct ChainBlockWithActivityDigests {
     /// List of the activity digests merged by this chain block, grouped by LaneId, including proofs for their validity.
     /// To keep order intact this is a Vec of structs rather than a HashMap.
     /// If this ATAN holds a single lane, a single entry with the activity digests of the selected lane will be included.
-    /// If this ATAN holds all lanes, all accepted transactions will be included, with one entry per lane with activity.
+    /// If this ATAN holds all lanes, activity digests for all accepted transactions will be included, with one entry per lane with activity.
     pub activity_digests_with_proofs: Vec<LaneActivityDigestsWithProof>,
 }
 
@@ -108,7 +105,7 @@ impl ChainBlock {
     pub fn base(&self) -> &ChainBlockBase {
         match self {
             ChainBlock::Bare(chain_block) => &chain_block.base,
-            ChainBlock::WithActivityDigest(chain_block) => &chain_block.base,
+            ChainBlock::WithActivityDigests(chain_block) => &chain_block.base,
             ChainBlock::WithTransactions(chain_block) => &chain_block.base,
         }
     }
