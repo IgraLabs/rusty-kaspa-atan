@@ -5,7 +5,7 @@ use kaspa_atan_core::errors::ValidationError::{
     UnmatchingActiveLanesRootForDifferentLanes,
 };
 use kaspa_atan_core::errors::{Actual, AtanResult, Expected};
-use kaspa_atan_core::model::{ActivityDigest, ChainBlock, LaneActivityDigestsWithProof, MergesetContext, MinerPayload};
+use kaspa_atan_core::model::{ActivityDigest, ChainBlock, ChainBlockBase, LaneActivityDigestsWithProof, MergesetContext, MinerPayload};
 use kaspa_hashes::{Hash, SeqCommitActiveNode};
 use kaspa_seq_commit::hashing::{
     activity_digest_lane, activity_leaf, lane_key, lane_tip_next, mergeset_context_hash, miner_payload_leaf, miner_payload_root,
@@ -17,8 +17,8 @@ use kaspa_seq_commit::types::{
 
 impl<F, G> AtanValidator<F, G>
 where
-    F: Fn() -> ChainBlock,
-    G: Fn() -> ChainBlock,
+    F: Fn() -> ChainBlockBase,
+    G: Fn() -> ChainBlockBase,
 {
     /// Calculates the expected sequencing commitment for the given ChainBlock according to KIP-21.
     ///

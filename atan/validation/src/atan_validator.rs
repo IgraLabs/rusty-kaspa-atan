@@ -1,7 +1,7 @@
 use kaspa_atan_core::errors::AtanError::Validation;
 use kaspa_atan_core::errors::ValidationError::{HistoricalBlockDoesntConnect, InvalidSequencingCommitment, RecentBlockDoesntConnect};
 use kaspa_atan_core::errors::{Actual, AtanResult, Expected};
-use kaspa_atan_core::model::ChainBlock;
+use kaspa_atan_core::model::{ChainBlock, ChainBlockBase};
 use kaspa_seq_commit::types::LaneId;
 
 /// Provides validation services for ChainBlocks.
@@ -32,8 +32,8 @@ use kaspa_seq_commit::types::LaneId;
 /// 4. Validate that the expected sequencing commitment equals the stated sequencing commitment.
 pub struct AtanValidator<F, G>
 where
-    F: Fn() -> ChainBlock,
-    G: Fn() -> ChainBlock,
+    F: Fn() -> ChainBlockBase,
+    G: Fn() -> ChainBlockBase,
 {
     /// The lane ID this ATAN keeps. None if this ATAN keeps all lane IDs.
     pub(crate) lane_id: Option<LaneId>,
@@ -45,8 +45,8 @@ where
 
 impl<F, G> AtanValidator<F, G>
 where
-    F: Fn() -> ChainBlock,
-    G: Fn() -> ChainBlock,
+    F: Fn() -> ChainBlockBase,
+    G: Fn() -> ChainBlockBase,
 {
     /// Creates a new AtanValidator.
     ///
@@ -73,7 +73,7 @@ where
     pub fn validate_recent_chain_block(&self, chain_block: &ChainBlock) -> AtanResult<()> {
         // 1. If this is a recent chain block:
         //     1.1. Validate that its declared selected parent sequencing commitment is equal to the chain's tip sequencing commitment.
-        let expected_selected_parent_sequencing_commitment = (self.get_chain_tip_callback)().base().sequencing_commitment;
+        let expected_selected_parent_sequencing_commitment = (self.get_chain_tip_callback)().sequencing_commitment;
         let actual_selected_parent_sequencing_commitment = chain_block.base().selected_parent_sequencing_commitment;
 
         if actual_selected_parent_sequencing_commitment != expected_selected_parent_sequencing_commitment {
@@ -101,7 +101,7 @@ where
     pub fn validate_historical_chain_block(&self, chain_block: &ChainBlock) -> AtanResult<()> {
         // 2. If this is a historical chain block:
         //     2.1. Validate that its sequencing commitment is equal to the chain's sink selected parent sequencing commitment.
-        let expected_sequencing_commitment = (self.get_chain_sink_callback)().base().selected_parent_sequencing_commitment;
+        let expected_sequencing_commitment = (self.get_chain_sink_callback)().selected_parent_sequencing_commitment;
         let actual_sequencing_commitment = chain_block.base().sequencing_commitment;
 
         if actual_sequencing_commitment != expected_sequencing_commitment {
