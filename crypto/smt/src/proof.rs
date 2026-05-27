@@ -41,11 +41,12 @@ use crate::store::{BranchKey, CollapsedLeaf};
 /// verifying multiple proofs against the same tree root. Upper branches are
 /// shared across proofs, so this can significantly reduce hashing work.
 pub type ProofBranchCache = alloc::collections::BTreeMap<BranchKey, Hash>;
-use crate::{DEPTH, SmtHasher, bit_at, hash_node};
+use crate::{bit_at, hash_node, SmtHasher, DEPTH};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SmtProofError {
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
+    )]
     SiblingCountMismatch { expected: usize, actual: usize },
 }
 
@@ -393,5 +394,46 @@ impl OwnedSmtProof {
     /// Number of empty (bitmap-elided) sibling positions.
     pub fn empty_count(&self) -> usize {
         DEPTH - self.siblings.len()
+    }
+}
+
+/// Borrowed, zero-copy compressed multi-lane proof for a 256-bit Sparse Merkle Tree.
+///
+/// Once keys and their termination depths are defined, a canonical order of siblings can be established.
+/// The siblings are ordered first by depth descending, then by their partial key ascending.
+/// This way validation can iteratively reconstruct all levels of the tree bottom-to-top.
+///
+/// The `bitmap` and `siblings` fields will be sorted this way.
+/// `siblings` will contain a value only for nodes that have their bitmap bit unset.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SmtMultiProof<'a> {
+    /// An N-byte bitmap, where N = `siblings.len()` / 8.
+    /// A set bit at position `d` means the sibling at position `d` in the canonical order equals the
+    /// canonical empty-subtree hash and is therefore omitted from `siblings`.
+    pub bitmap: &'a [u8],
+    /// Non-empty sibling hashes, in canonical order.
+    pub siblings: &'a [Hash],
+    /// A vector of lane keys and the depth at which proof terminates for this lane, ordered by
+    /// lane key.
+    pub depths: &'a [(Hash, u8)],
+}
+
+/// Owned compressed multi-lane proof for a 256-bit Sparse Merkle Tree.
+///
+/// This is the serializable/deserializable form of a proof. Use [`as_proof`](Self::as_proof)
+/// to obtain a borrowed [`SmtMultiProof`] for verification.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OwnedSmtMultiProof {
+    /// N-byte bitmap, see ['OwnedSmtMultiProof::bitmap'].
+    pub bitmap: Vec<u8>,
+    /// Non-empty sibling hashes, see ['OwnedSmtMultiProof::siblings'].
+    pub siblings: Vec<Hash>,
+    /// List of lane keys and their termination depth, see ['OwnedSmtMultiProof::depths'].
+    pub depths: Vec<(Hash, u8)>,
+}
+
+impl OwnedSmtMultiProof {
+    pub fn as_proof(&self) -> SmtMultiProof<'_> {
+        SmtMultiProof { bitmap: &self.bitmap, siblings: &self.siblings, depths: &self.depths }
     }
 }
