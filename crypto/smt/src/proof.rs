@@ -413,9 +413,9 @@ pub struct SmtMultiProof<'a> {
     pub bitmap: &'a [u8],
     /// Non-empty sibling hashes, in canonical order.
     pub siblings: &'a [Hash],
-    /// A vector of lane keys and the depth at which proof terminates for this lane, ordered by
-    /// lane key.
-    pub depths: &'a [(Hash, u8)],
+    /// List of termination depths for all lane keys.
+    /// One value per lane_key this SmtMultiProof proves.
+    pub depths: &'a [u8],
 }
 
 /// Owned compressed multi-lane proof for a 256-bit Sparse Merkle Tree.
@@ -428,8 +428,8 @@ pub struct OwnedSmtMultiProof {
     pub bitmap: Vec<u8>,
     /// Non-empty sibling hashes, see ['OwnedSmtMultiProof::siblings'].
     pub siblings: Vec<Hash>,
-    /// List of lane keys and their termination depth, see ['OwnedSmtMultiProof::depths'].
-    pub depths: Vec<(Hash, u8)>,
+    /// List of termination depths for all lane keys, see ['OwnedSmtMultiProof::depths'].
+    pub depths: Vec<u8>,
 }
 
 impl OwnedSmtMultiProof {
