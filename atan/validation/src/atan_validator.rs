@@ -30,6 +30,7 @@ use kaspa_seq_commit::types::LaneId;
 ///     3.4. Combine SeqStateRoot with SelectedParent.SequencingCommitment to get current block's sequencing commitment.
 ///
 /// 4. Validate that the expected sequencing commitment equals the stated sequencing commitment.
+#[allow(clippy::doc_overindented_list_items)]
 pub struct AtanValidator<F, G>
 where
     F: Fn() -> ChainBlockBase,
@@ -67,8 +68,8 @@ where
     /// * `Ok(())` if the block is valid and connects well to the existing chain.
     ///
     /// # Errors
-    /// * `AtanError::Validation(RecentBlockDoesntConnect)` - If the declared selected parent sequencing
-    ///     commitment is not equal to the chain's tip sequencing commitment.
+    /// * `AtanError::Validation(RecentBlockDoesntConnect)` - If the declared selected parent
+    ///   sequencing commitment is not equal to the chain's tip sequencing commitment.
     /// * `AtanError::Validation(_)` - If any of the validation steps fail.
     pub fn validate_recent_chain_block(&self, chain_block: &ChainBlock) -> AtanResult<()> {
         // 1. If this is a recent chain block:
@@ -96,7 +97,7 @@ where
     ///
     /// # Errors
     /// * `AtanError::Validation(HistoricalBlockDoesntConnect)` - If the declared sequencing commitment
-    ///     is not equal to the existing chain's sink selected parent sequencing commitment.
+    ///   is not equal to the existing chain's sink selected parent sequencing commitment.
     /// * `AtanError::Validation(_)` - If any of the validation steps fail.
     pub fn validate_historical_chain_block(&self, chain_block: &ChainBlock) -> AtanResult<()> {
         // 2. If this is a historical chain block:
