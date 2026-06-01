@@ -13,12 +13,13 @@
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use core::marker::PhantomData;
-use kaspa_hashes::Hash;
-
 use crate::proof::{OwnedSmtMultiProof, OwnedSmtProof, ProofTerminal};
 use crate::store::{BTreeSmtStore, BranchKey, CollapsedLeaf, LeafUpdate, Node, SmtStore, SortedLeafUpdates, SortedLeafUpdatesRef};
 use crate::{bit_at, hash_node, SmtHasher, DEPTH};
+use core::marker::PhantomData;
+use kaspa_hashes::Hash;
+use std::collections::VecDeque;
+use std::vec;
 
 /// A 256-bit Sparse Merkle Tree with incremental updates and cached root.
 ///
@@ -140,9 +141,42 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, S::Error> {
         let mut bitmap: Vec<u8> = Vec::new();
         let mut siblings: Vec<Hash> = Vec::new();
-        let mut depths: Vec<u8> = Vec::new();
+        let mut depths: Vec<(Hash, usize)> = Vec::new();
 
         // 1. Iterate BFS over keys, and calculate all required siblings + depths.
+        struct QueueItem<'a> {
+            keys: &'a [Hash],
+            depth: usize,
+        }
+        let mut queue = VecDeque::new();
+        let mut required_siblings = vec![];
+        queue.push_back(QueueItem { keys, depth: 0 });
+        loop {
+            if queue.is_empty() { // This means we have finished traversing all nodes
+                break;
+            }
+            let current = queue.pop_front().unwrap();
+            if current.keys.len() == 1 {
+                let key = current.keys[0];
+                depths.push((key, current.depth))
+            }
+
+            let split = current.keys.partition_point(|hash| bit_at(hash, current.depth) == true);
+            let (left, right) = current.keys.split_at(split);
+            // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
+            if left.is_empty() {
+                let branch_key = BranchKey::new(current.depth as u8, right.first().unwrap());
+                required_siblings.push(branch_key);
+                queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
+            } else if right.is_empty() {
+                let branch_key = BranchKey::new(current.depth as u8, left.first().unwrap());
+                required_siblings.push(branch_key);
+                queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
+            } else {
+                queue.push_back(QueueItem { keys: left, depth: current.depth + 1 });
+                queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
+            }
+        }
 
         // 2. For every required sibling - get it from store and append to `bitmap`, `siblings`
         todo!()
