@@ -98,7 +98,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                         }
                     } else {
                         // Read the sibling node directly.
-                        let sibling_key = child_branch_key(&branch_key, !goes_right, depth);
+                        let sibling_key = child_branch_key(&branch_key, !goes_right);
                         match self.store.get_node(&sibling_key)? {
                             None => {
                                 bitmap[depth / 8] |= 1 << (depth % 8);
@@ -321,11 +321,12 @@ fn read_node<S: SmtStore>(store: &S, changes: &SmtNodeChanges, bk: &BranchKey) -
 /// `parent.depth + 1` is safe because this is never called at the leaf-parent
 /// level (depth 255). In `prove()`, depth 255 is handled via `get_leaf` instead.
 /// In `compute_subtree`, depth 255 is handled by the `depth == DEPTH - 1` early return.
-fn child_branch_key(parent: &BranchKey, right: bool, depth: usize) -> BranchKey {
+fn child_branch_key(parent: &BranchKey, right: bool) -> BranchKey {
     debug_assert!(parent.depth < 255, "child_branch_key called at leaf-parent level");
     let child_depth = parent.depth + 1;
     let mut bytes = parent.node_key.as_bytes();
     if right {
+        let depth = parent.depth as usize;
         bytes[depth / 8] |= 0x80 >> (depth % 8);
     }
     BranchKey { depth: child_depth, node_key: Hash::from_bytes(bytes) }
@@ -470,7 +471,7 @@ fn compute_subtree<H: SmtHasher, S: SmtStore>(
     if depth < DEPTH - 1 && let NodeResult::Collapsed(cl) = result
     {
         let goes_right = bit_at(&cl.lane_key, depth);
-        let child_key = child_branch_key(&subtree_key, goes_right, depth);
+        let child_key = child_branch_key(&subtree_key, goes_right);
         // Direct insert (not record_change) — we want this tombstone
         // even if the child position currently holds the same Collapsed
         // (in which case `record_change`'s `existing == new_node` skip
@@ -493,7 +494,7 @@ fn read_sibling_result<S: SmtStore>(
     sibling_is_right: bool,
     depth: usize,
 ) -> Result<NodeResult, S::Error> {
-    let sibling_key = child_branch_key(parent_key, sibling_is_right, depth);
+    let sibling_key = child_branch_key(parent_key, sibling_is_right);
     match read_node::<S>(store, changes, &sibling_key)? {
         None => Ok(NodeResult::Empty),
         Some(Node::Collapsed(cl)) => Ok(NodeResult::Collapsed(cl)),
