@@ -467,13 +467,13 @@ fn compute_subtree<H: SmtHasher, S: SmtStore>(
     let (left_updates, right_updates) = updates.partition_by_bit(depth);
 
     let left_result = if left_updates.is_empty() {
-        read_sibling_result::<S>(store, changes, &subtree_key, false, depth)?
+        read_sibling_result::<S>(store, changes, &subtree_key, false)?
     } else {
         compute_subtree::<H, S>(store, changes, left_updates, depth + 1)?
     };
 
     let right_result = if right_updates.is_empty() {
-        read_sibling_result::<S>(store, changes, &subtree_key, true, depth)?
+        read_sibling_result::<S>(store, changes, &subtree_key, true)?
     } else {
         compute_subtree::<H, S>(store, changes, right_updates, depth + 1)?
     };
@@ -524,7 +524,6 @@ fn read_sibling_result<S: SmtStore>(
     changes: &SmtNodeChanges,
     parent_key: &BranchKey,
     sibling_is_right: bool,
-    depth: usize,
 ) -> Result<NodeResult, S::Error> {
     let sibling_key = child_branch_key(parent_key, sibling_is_right);
     match read_node::<S>(store, changes, &sibling_key)? {
