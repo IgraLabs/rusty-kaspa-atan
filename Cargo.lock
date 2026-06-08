@@ -2837,7 +2837,9 @@ version = "1.2.2-toc.4"
 dependencies = [
  "kaspa-consensus-core",
  "kaspa-hashes",
+ "kaspa-seq-commit",
  "kaspa-smt",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2851,6 +2853,12 @@ version = "1.2.2-toc.4"
 [[package]]
 name = "kaspa-atan-validation"
 version = "1.2.2-toc.4"
+dependencies = [
+ "kaspa-atan-core",
+ "kaspa-hashes",
+ "kaspa-seq-commit",
+ "kaspa-smt",
+]
 
 [[package]]
 name = "kaspa-bip32"

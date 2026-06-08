@@ -149,6 +149,7 @@ kaspa-wrpc-wasm = { version = "1.2.2-toc.4", path = "rpc/wrpc/wasm" }
 kaspa-wrpc-example-subscriber = { version = "1.2.2-toc.4", path = "rpc/wrpc/examples/subscriber" }
 kaspad = { version = "1.2.2-toc.4", path = "kaspad" }
 kaspa-alloc = { version = "1.2.2-toc.4", path = "utils/alloc" }
+kaspa-atan-core = { version = "1.2.2-toc.4", path = "atan/core" }
 
 # external
 aes = "0.8.3"
@@ -308,7 +309,7 @@ risc0-zkp = "=3.0.4"
 # workflow dependencies that are not a part of core libraries
 
 # workflow-perf-monitor = { path = "../../../workflow-perf-monitor-rs" }
-workflow-perf-monitor = { git='https://github.com/kaspanet/workflow-perf-monitor-rs.git', tag = "v0.0.3" }
+workflow-perf-monitor = { git = 'https://github.com/kaspanet/workflow-perf-monitor-rs.git', tag = "v0.0.3" }
 nw-sys = "0.1.6"
 rustls = { version = "0.23.18", default-features = false, features = ["ring"] }
 
