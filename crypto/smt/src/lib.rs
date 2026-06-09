@@ -24,7 +24,6 @@
 
 extern crate alloc;
 extern crate core;
-
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -32,6 +31,7 @@ pub mod proof;
 pub mod store;
 pub mod streaming;
 pub mod tree;
+pub mod prove;
 
 use kaspa_hashes::{Hash, Hasher};
 
