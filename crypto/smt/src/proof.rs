@@ -415,7 +415,7 @@ pub struct SmtMultiProof<'a> {
     pub siblings: &'a [Hash],
     /// List of termination depths for all lane keys.
     /// One value per lane_key this SmtMultiProof proves.
-    pub depths: &'a [u8],
+    pub terminals: &'a [ProofTerminal],
 }
 
 /// Owned compressed multi-lane proof for a 256-bit Sparse Merkle Tree.
@@ -424,16 +424,16 @@ pub struct SmtMultiProof<'a> {
 /// to obtain a borrowed [`SmtMultiProof`] for verification.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OwnedSmtMultiProof {
-    /// N-byte bitmap, see ['OwnedSmtMultiProof::bitmap'].
+    /// N-byte bitmap, see ['SmtMultiProof::bitmap'].
     pub bitmap: Vec<u8>,
-    /// Non-empty sibling hashes, see ['OwnedSmtMultiProof::siblings'].
+    /// Non-empty sibling hashes, see ['SmtMultiProof::siblings'].
     pub siblings: Vec<Hash>,
-    /// List of termination depths for all lane keys, see ['OwnedSmtMultiProof::depths'].
-    pub depths: Vec<u8>,
+    /// List of tree traversal terminals, see ['SmtMultiProof::depths'].
+    pub terminals: Vec<ProofTerminal>,
 }
 
 impl OwnedSmtMultiProof {
     pub fn as_proof(&self) -> SmtMultiProof<'_> {
-        SmtMultiProof { bitmap: &self.bitmap, siblings: &self.siblings, depths: &self.depths }
+        SmtMultiProof { bitmap: &self.bitmap, siblings: &self.siblings, terminals: &self.terminals }
     }
 }
