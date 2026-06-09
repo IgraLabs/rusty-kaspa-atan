@@ -1,6 +1,6 @@
 use crate::proof::{OwnedSmtMultiProof, OwnedSmtProof, ProofTerminal};
 use crate::store::{BranchKey, Node, SmtStore};
-use crate::tree::SparseMerkleTree;
+use crate::tree::{child_branch_key, SparseMerkleTree};
 use crate::{bit_at, hash_node, SmtHasher, DEPTH};
 use kaspa_hashes::Hash;
 use std::collections::VecDeque;
@@ -10,6 +10,22 @@ enum NodeBranchingData {
     Sibling(Option<Hash>),  // Will be None if
     Terminal(ProofTerminal),
     EmptySubtree,
+}
+
+struct MultiProofBitmap {
+    bitmap: Vec<u8>,
+    current_index: usize,
+}
+impl MultiProofBitmap {
+    fn append(&mut self, value: bool) {
+        self.current_index += 1;
+        if self.current_index % 8 == 0 {
+            self.bitmap.push(0);
+        }
+        if value {
+            self.bitmap[self.current_index / 8] |= 1 << (self.current_index % 8);
+        }
+    }
 }
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
@@ -40,7 +56,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     }
                 } else {
                     // Read the sibling node directly.
-                    let sibling_key = crate::tree::child_branch_key(&branch_key, !goes_right);
+                    let sibling_key = child_branch_key(&branch_key, !goes_right);
                     match self.store.get_node(&sibling_key)? {
                         None => {
                             Ok(NodeBranchingData::Sibling(None))
@@ -106,6 +122,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     }
 
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, S::Error> {
+        let mut bitmap_index: usize = 0;
         let mut proof = OwnedSmtMultiProof {
             bitmap: Vec::new(),
             siblings: Vec::new(),

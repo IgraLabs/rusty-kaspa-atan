@@ -13,13 +13,10 @@
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use crate::proof::{OwnedSmtProof, ProofTerminal};
 use crate::store::{BTreeSmtStore, BranchKey, CollapsedLeaf, LeafUpdate, Node, SmtStore, SortedLeafUpdates, SortedLeafUpdatesRef};
-use crate::tree::NodeBranchingData::{EmptySubtree, Sibling, Terminal};
 use crate::{bit_at, hash_node, SmtHasher, DEPTH};
 use core::marker::PhantomData;
 use kaspa_hashes::Hash;
-use std::vec;
 
 /// A 256-bit Sparse Merkle Tree with incremental updates and cached root.
 ///
@@ -205,7 +202,7 @@ fn read_node<S: SmtStore>(store: &S, changes: &SmtNodeChanges, bk: &BranchKey) -
 /// `parent.depth + 1` is safe because this is never called at the leaf-parent
 /// level (depth 255). In `prove()`, depth 255 is handled via `get_leaf` instead.
 /// In `compute_subtree`, depth 255 is handled by the `depth == DEPTH - 1` early return.
-fn child_branch_key(parent: &BranchKey, right: bool) -> BranchKey {
+pub(crate) fn child_branch_key(parent: &BranchKey, right: bool) -> BranchKey {
     debug_assert!(parent.depth < 255, "child_branch_key called at leaf-parent level");
     let child_depth = parent.depth + 1;
     let mut bytes = parent.node_key.as_bytes();
@@ -388,7 +385,7 @@ fn read_sibling_result<S: SmtStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proof::SmtProofError;
+    use crate::proof::{OwnedSmtProof, ProofTerminal, SmtProofError};
     use alloc::vec;
     use kaspa_hashes::{HasherBase, SeqCommitActiveNode, ZERO_HASH};
     use rand::{rngs::StdRng, Rng, SeedableRng};
