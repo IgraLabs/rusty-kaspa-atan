@@ -12,11 +12,18 @@ enum NodeBranchingData {
     EmptySubtree,
 }
 
-struct MultiProofBitmap {
+struct MutableBitmap {
     bitmap: Vec<u8>,
     current_index: usize,
 }
-impl MultiProofBitmap {
+impl MutableBitmap {
+    fn new() -> Self {
+        Self { bitmap: Vec::new(), current_index: 0 }
+    }
+    fn bitmap(self) -> Vec<u8> {
+        self.bitmap
+    }
+
     fn append(&mut self, value: bool) {
         self.current_index += 1;
         if self.current_index % 8 == 0 {
@@ -121,15 +128,36 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         Ok(OwnedSmtProof { bitmap, siblings, terminal })
     }
 
-    pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, S::Error> {
-        let mut bitmap_index: usize = 0;
-        let mut proof = OwnedSmtMultiProof {
-            bitmap: Vec::new(),
-            siblings: Vec::new(),
-            depths: Vec::new(),
+    // TODO: find better name for this function
+    fn proof_step(&self, bitmap: &mut MutableBitmap, siblings: &mut Vec<Hash>, terminals: &mut Vec<ProofTerminal>, keys: &[Hash], depth: usize) -> Result<(), S::Error> {
+        match self.get_branching_data(&keys[0], depth)? {
+            NodeBranchingData::Sibling(sibling) => match sibling {
+                None => {
+                    bitmap.append(false)
+                }
+                Some(sibling_hash) => {
+                    bitmap.append(true);
+                    siblings.push(sibling_hash);
+                }
+            }
+            NodeBranchingData::Terminal(proof_terminal) => {
+                if keys.len() > 1 {
+                    todo!() // TODO: Err out
+                }
+                terminals.push(proof_terminal);
+            }
+            NodeBranchingData::EmptySubtree => {
+                todo!() // TODO: Figure out if and when this happens, I don't think this should be allowed.
+            }
         };
+        Ok(())
+    }
 
-        // 1. Iterate BFS over keys, and calculate all required siblings + depths.
+    pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, S::Error> {
+        let mut bitmap = MutableBitmap::new();
+        let mut siblings = Vec::new();
+        let mut terminals = Vec::new();
+
         struct QueueItem<'a> {
             keys: &'a [Hash],
             depth: u8,
@@ -141,31 +169,25 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                 break;
             }
             let current = queue.pop_front().unwrap();
-            if current.keys.len() == 1 {
-                let key = current.keys[0];
-                proof.depths.push(current.depth)
-            }
 
             let split = current.keys.partition_point(|hash| bit_at(hash, current.depth as usize) == true);
             let (left, right) = current.keys.split_at(split);
             // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
             if left.is_empty() {
-                let branch_key = BranchKey::new(current.depth, right.first().unwrap());
-                self.add_sibling_of(&mut proof, &branch_key);
+                self.proof_step(&mut bitmap, &mut siblings, &mut terminals, right, current.depth as usize)?;
                 queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
             } else if right.is_empty() {
-                let branch_key = BranchKey::new(current.depth, left.first().unwrap());
-                self.add_sibling_of(&mut proof, &branch_key);
+                self.proof_step(&mut bitmap, &mut siblings, &mut terminals, left, current.depth as usize)?;
                 queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
             } else {
                 queue.push_back(QueueItem { keys: left, depth: current.depth + 1 });
                 queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
             }
         }
-        Ok(proof)
-    }
-
-    fn add_sibling_of(&self, proof: &mut OwnedSmtMultiProof, branch_key: &BranchKey) {
-        let branch_key_bytes = branch_key.node_key.as_bytes();
+        Ok(OwnedSmtMultiProof {
+            bitmap: bitmap.bitmap(),
+            siblings,
+            terminals,
+        })
     }
 }
