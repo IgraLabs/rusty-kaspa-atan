@@ -3,11 +3,11 @@ use crate::store::{BranchKey, Node, SmtStore};
 use crate::tree::{child_branch_key, SparseMerkleTree};
 use crate::{bit_at, hash_node, SmtHasher, DEPTH};
 use kaspa_hashes::Hash;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::prelude::rust_2015::Vec;
 
 enum NodeBranchingData {
-    Sibling(Option<Hash>),  // Will be None if
+    Sibling(Option<Hash>), // Will be None if
     Terminal(ProofTerminal),
     EmptySubtree,
 }
@@ -35,6 +35,10 @@ impl MutableBitmap {
     }
 }
 
+pub enum ProveError<S: SmtStore> {
+    StoreError(S::Error),
+}
+
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     /// Retrieves the branching data regarding `branch_key` from the storage
     ///
@@ -54,9 +58,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     sib_bytes[depth / 8] ^= 0x80 >> (depth % 8);
                     let sibling_leaf_key = Hash::from_bytes(sib_bytes);
                     match self.store.get_leaf(&sibling_leaf_key)? {
-                        None => {
-                            Ok(NodeBranchingData::Sibling(None))
-                        }
+                        None => Ok(NodeBranchingData::Sibling(None)),
                         Some(leaf_hash) => {
                             Ok(NodeBranchingData::Sibling(Some(hash_node::<H::CollapsedHasher>(sibling_leaf_key, leaf_hash))))
                         }
@@ -65,12 +67,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     // Read the sibling node directly.
                     let sibling_key = child_branch_key(&branch_key, !goes_right);
                     match self.store.get_node(&sibling_key)? {
-                        None => {
-                            Ok(NodeBranchingData::Sibling(None))
-                        }
-                        Some(Node::Internal(hash)) => {
-                            Ok(NodeBranchingData::Sibling(Some(hash)))
-                        }
+                        None => Ok(NodeBranchingData::Sibling(None)),
+                        Some(Node::Internal(hash)) => Ok(NodeBranchingData::Sibling(Some(hash))),
                         Some(Node::Collapsed(cl)) => {
                             Ok(NodeBranchingData::Sibling(Some(hash_node::<H::CollapsedHasher>(cl.lane_key, cl.leaf_hash))))
                         }
@@ -84,9 +82,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     Ok(NodeBranchingData::Terminal(ProofTerminal::CollapsedOther { depth: depth as u8, leaf: cl }))
                 }
             }
-            None => {
-                Ok(NodeBranchingData::EmptySubtree)
-            }
+            None => Ok(NodeBranchingData::EmptySubtree),
         }
     }
 
@@ -108,7 +104,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     Some(sibling_hash) => {
                         siblings.push(sibling_hash);
                     }
-                }
+                },
                 NodeBranchingData::Terminal(proof_terminal) => {
                     for d in depth..DEPTH {
                         bitmap[d / 8] |= 1 << (d % 8);
@@ -117,6 +113,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     break;
                 }
                 NodeBranchingData::EmptySubtree => {
+                    // TODO: Check if should err out here?
                     for d in depth..DEPTH {
                         bitmap[d / 8] |= 1 << (d % 8);
                     }
@@ -129,22 +126,27 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     }
 
     // TODO: find better name for this function
-    fn proof_step(&self, bitmap: &mut MutableBitmap, siblings: &mut Vec<Hash>, terminals: &mut Vec<ProofTerminal>, keys: &[Hash], depth: usize) -> Result<(), S::Error> {
-        match self.get_branching_data(&keys[0], depth)? {
+    fn proof_step(
+        &self,
+        bitmap: &mut MutableBitmap,
+        siblings: &mut Vec<Hash>,
+        terminals: &mut HashMap<Hash, ProofTerminal>,
+        keys: &[Hash],
+        depth: usize,
+    ) -> Result<(), ProveError<S>> {
+        match self.get_branching_data(&keys[0], depth).map_err(ProveError::StoreError)? {
             NodeBranchingData::Sibling(sibling) => match sibling {
-                None => {
-                    bitmap.append(false)
-                }
+                None => bitmap.append(false),
                 Some(sibling_hash) => {
                     bitmap.append(true);
                     siblings.push(sibling_hash);
                 }
-            }
+            },
             NodeBranchingData::Terminal(proof_terminal) => {
-                if keys.len() > 1 {
+                if keys.len() != 1 {
                     todo!() // TODO: Err out
                 }
-                terminals.push(proof_terminal);
+                terminals.insert(keys[0], proof_terminal);
             }
             NodeBranchingData::EmptySubtree => {
                 todo!() // TODO: Figure out if and when this happens, I don't think this should be allowed.
@@ -153,10 +155,10 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         Ok(())
     }
 
-    pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, S::Error> {
+    pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
         let mut bitmap = MutableBitmap::new();
         let mut siblings = Vec::new();
-        let mut terminals = Vec::new();
+        let mut terminals = HashMap::new();
 
         struct QueueItem<'a> {
             keys: &'a [Hash],
@@ -165,7 +167,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         let mut queue = VecDeque::new();
         queue.push_back(QueueItem { keys, depth: 0 });
         loop {
-            if queue.is_empty() { // This means we have finished traversing all nodes
+            if queue.is_empty() {
+                // This means we have finished traversing all nodes
                 break;
             }
             let current = queue.pop_front().unwrap();
@@ -184,10 +187,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                 queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
             }
         }
-        Ok(OwnedSmtMultiProof {
-            bitmap: bitmap.bitmap(),
-            siblings,
-            terminals,
-        })
+
+        let terminals = keys.iter().map(|key| terminals.remove(key).unwrap_or(ProofTerminal::Full).clone()).collect();
+        Ok(OwnedSmtMultiProof { bitmap: bitmap.bitmap(), siblings, terminals })
     }
 }

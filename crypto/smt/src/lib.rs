@@ -28,10 +28,10 @@ extern crate core;
 extern crate std;
 
 pub mod proof;
+pub mod prove;
 pub mod store;
 pub mod streaming;
 pub mod tree;
-pub mod prove;
 
 use kaspa_hashes::{Hash, Hasher};
 

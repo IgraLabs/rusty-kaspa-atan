@@ -41,12 +41,11 @@ use crate::store::{BranchKey, CollapsedLeaf};
 /// verifying multiple proofs against the same tree root. Upper branches are
 /// shared across proofs, so this can significantly reduce hashing work.
 pub type ProofBranchCache = alloc::collections::BTreeMap<BranchKey, Hash>;
-use crate::{bit_at, hash_node, SmtHasher, DEPTH};
+use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SmtProofError {
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
-    )]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
     SiblingCountMismatch { expected: usize, actual: usize },
 }
 
