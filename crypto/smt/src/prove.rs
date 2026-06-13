@@ -5,6 +5,7 @@ use crate::{bit_at, hash_node, SmtHasher, DEPTH};
 use kaspa_hashes::Hash;
 use std::collections::{HashMap, VecDeque};
 use std::prelude::rust_2015::Vec;
+use thiserror::Error;
 
 enum NodeBranchingData {
     Sibling(Option<Hash>), // Will be None if
@@ -35,8 +36,14 @@ impl MutableBitmap {
     }
 }
 
+#[derive(Error, Debug, Clone)]
 pub enum ProveError<S: SmtStore> {
+    #[error("Store error: {0}")]
     StoreError(S::Error),
+    #[error("Reached a terminal while split is still multiple keys: {0:?}")]
+    TerminalForMultipleKeys(Vec<Hash>),
+    #[error("Empty subtree for key: {0}")]
+    EmptySubtreeKey(Hash),
 }
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
@@ -144,12 +151,12 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
             },
             NodeBranchingData::Terminal(proof_terminal) => {
                 if keys.len() != 1 {
-                    todo!() // TODO: Err out
+                    return Err(ProveError::TerminalForMultipleKeys(keys.to_vec()));
                 }
                 terminals.insert(keys[0], proof_terminal);
             }
             NodeBranchingData::EmptySubtree => {
-                todo!() // TODO: Figure out if and when this happens, I don't think this should be allowed.
+                return Err(ProveError::EmptySubtreeKey(keys[0]));
             }
         };
         Ok(())
