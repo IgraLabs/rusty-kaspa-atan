@@ -204,9 +204,9 @@ impl<'a> SmtProof<'a> {
         mut cache: Option<&mut ProofBranchCache>,
     ) -> Result<Hash, SmtProofError> {
         // Validate that the sibling count matches the bitmap up to the terminal depth.
-        let expected = bitmap_clear_count_before(self.bitmap, self.terminal);
-        if self.siblings.len() != expected {
-            return Err(SmtProofError::SiblingCountMismatch { expected, actual: self.siblings.len() });
+        let expected_sibling_count = bitmap_clear_count_before(self.bitmap, self.terminal);
+        if self.siblings.len() != expected_sibling_count {
+            return Err(SmtProofError::SiblingCountMismatch { expected: expected_sibling_count, actual: self.siblings.len() });
         }
 
         // Seed the initial hash based on the terminal variant and queried leaf.
@@ -406,10 +406,13 @@ impl OwnedSmtProof {
 /// `siblings` will contain a value only for nodes that have their bitmap bit unset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SmtMultiProof<'a> {
-    /// An N-byte bitmap, where N = `siblings.len()` / 8.
+    /// An N-byte bitmap, where N = ceil(`siblings.len()` / 8).
     /// A set bit at position `d` means the sibling at position `d` in the canonical order equals the
     /// canonical empty-subtree hash and is therefore omitted from `siblings`.
     pub bitmap: &'a [u8],
+    /// The total amount of siblings (both empty and non-empty hashes),
+    /// Used to determine the number of meaningful bits stored in `bitmap`.
+    pub total_sibling_count: usize,
     /// Non-empty sibling hashes, in canonical order.
     pub siblings: &'a [Hash],
     /// List of termination depths for all lane keys.
@@ -425,6 +428,8 @@ pub struct SmtMultiProof<'a> {
 pub struct OwnedSmtMultiProof {
     /// N-byte bitmap, see ['SmtMultiProof::bitmap'].
     pub bitmap: Vec<u8>,
+    /// The total amount of siblings, see ['SmtMultiProof::total_sibling_count'].
+    pub total_sibling_count: usize,
     /// Non-empty sibling hashes, see ['SmtMultiProof::siblings'].
     pub siblings: Vec<Hash>,
     /// List of tree traversal terminals, see ['SmtMultiProof::depths'].
@@ -433,7 +438,7 @@ pub struct OwnedSmtMultiProof {
 
 impl OwnedSmtMultiProof {
     pub fn as_proof(&self) -> SmtMultiProof<'_> {
-        SmtMultiProof { bitmap: &self.bitmap, siblings: &self.siblings, terminals: &self.terminals }
+        SmtMultiProof { bitmap: &self.bitmap, total_sibling_count: self.total_sibling_count, siblings: &self.siblings, terminals: &self.terminals }
     }
 }
 impl<'a> SmtMultiProof<'a> {
@@ -492,6 +497,23 @@ impl<'a> SmtMultiProof<'a> {
         leaf_hash: Option<Hash>,
         mut cache: Option<&mut ProofBranchCache>,
     ) -> Result<Hash, SmtProofError> {
+        // 1. Validate sibling count
+        let zero_bits: usize = self.bitmap.iter().map(|byte| byte.count_zeros() as usize).sum();
+        let trailing_bits = 8 - (self.total_sibling_count % 8);
+        let expected_sibling_count = zero_bits - trailing_bits;
+        if self.siblings.len() != expected_sibling_count {
+            return Err(SmtProofError::SiblingCountMismatch { expected: expected_sibling_count, actual: self.siblings.len() });
+        }
+
+
+        // 2. For each terminal compute the seed
+
+        // 3. Create bottom-to-top priority queue with Ord:
+        //      a. Depth
+        //      b. Global sequence, for stability
+
+        // 4. Iterate bottom-to-top combining branches using either sibling, or two-sided
+        // knowns
         todo!()
     }
 }
