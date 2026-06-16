@@ -33,6 +33,8 @@
 
 use alloc::vec::Vec;
 use kaspa_hashes::{Hash, ZERO_HASH};
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use crate::store::{BranchKey, CollapsedLeaf};
 /// Cache of already-computed branch hashes, keyed by `(depth, key_prefix)`.
@@ -45,9 +47,17 @@ use crate::{bit_at, hash_node, SmtHasher, DEPTH};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SmtProofError {
+    // TODO: Add Expected/Actual types here too.
     #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
     )]
     SiblingCountMismatch { expected: usize, actual: usize },
+    #[error("key count mismatch: expected {expected} keys, but got {actual}")]
+    KeyCountMismatch { expected: usize, actual: usize },
+    #[error("leaf hashes count mismatch: expected {expected} leaf hashes, but got {actual}")]
+    LeafHashesCountMismatch { expected: usize, actual: usize },
+    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof"
+    )]
+    CollapsedOtherInMultiProof,
 }
 
 /// Returns `true` if the sibling at depth `d` is empty (its bitmap bit is set),
@@ -441,19 +451,38 @@ impl OwnedSmtMultiProof {
         SmtMultiProof { bitmap: &self.bitmap, total_sibling_count: self.total_sibling_count, siblings: &self.siblings, terminals: &self.terminals }
     }
 }
+
+#[derive(Debug, Eq, PartialEq)]
+struct QueueItem {
+    key: Hash,
+    depth: u8,
+    key_index: usize,
+    value: Hash,
+}
+impl Ord for QueueItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.depth.cmp(&other.depth).then_with(|| other.key_index.cmp(&self.key_index))
+    }
+}
+
+
+impl PartialOrd for QueueItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+}
+
 impl<'a> SmtMultiProof<'a> {
     /// Reconstructs the Merkle root that this proof implies for `keys` and given leaf_hashes.
     ///
     /// The reconstruction respects [`self.terminal`](ProofTerminal) to determine the starting
     /// hash and loop depth. Returns an error if the sibling count doesn't match the bitmap.
-    pub fn compute_root<H: SmtHasher>(&self, keys: &Hash, leaf_hashes: Option<Hash>) -> Result<Hash, SmtProofError> {
+    pub fn compute_root<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash]) -> Result<Hash, SmtProofError> {
         self.compute_root_inner::<H>(keys, leaf_hashes, None)
     }
 
     /// Verify that the proof is consistent with the given `expected_root`.
     ///
     /// Equivalent to `self.compute_root(key, leaf_hash)? == expected_root`.
-    pub fn verify<H: SmtHasher>(&self, keys: &Hash, leaf_hashes: Option<Hash>, expected_root: Hash) -> Result<bool, SmtProofError> {
+    pub fn verify<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], expected_root: Hash) -> Result<bool, SmtProofError> {
         Ok(self.compute_root::<H>(keys, leaf_hashes)? == expected_root)
     }
 
@@ -464,12 +493,12 @@ impl<'a> SmtMultiProof<'a> {
     /// many proofs against the same tree, since upper branches are shared.
     pub fn verify_cached<H: SmtHasher>(
         &self,
-        key: &Hash,
-        leaf_hash: Option<Hash>,
+        keys: &[Hash],
+        leaf_hashes: &[Hash],
         expected_root: Hash,
         cache: &mut ProofBranchCache,
     ) -> Result<bool, SmtProofError> {
-        let computed = self.compute_root_inner::<H>(key, leaf_hash, Some(cache))?;
+        let computed = self.compute_root_inner::<H>(keys, leaf_hashes, Some(cache))?;
         Ok(computed == expected_root)
     }
 
@@ -493,10 +522,17 @@ impl<'a> SmtMultiProof<'a> {
     /// cache hits skip the hash computation and new results are inserted.
     fn compute_root_inner<H: SmtHasher>(
         &self,
-        key: &Hash,
-        leaf_hash: Option<Hash>,
+        keys: &[Hash],
+        leaf_hashes: &[Hash],
         mut cache: Option<&mut ProofBranchCache>,
     ) -> Result<Hash, SmtProofError> {
+        // 0. Validate the counts of keys, leaf_hashes and terminals match
+        if self.terminals.len() != keys.len() {
+            return Err(SmtProofError::KeyCountMismatch { expected: self.terminals.len(), actual: keys.len() });
+        }
+        if self.terminals.len() != leaf_hashes.len() {
+            return Err(SmtProofError::LeafHashesCountMismatch { expected: self.terminals.len(), actual: leaf_hashes.len() });
+        }
         // 1. Validate sibling count
         let zero_bits: usize = self.bitmap.iter().map(|byte| byte.count_zeros() as usize).sum();
         let trailing_bits = 8 - (self.total_sibling_count % 8);
@@ -505,12 +541,33 @@ impl<'a> SmtMultiProof<'a> {
             return Err(SmtProofError::SiblingCountMismatch { expected: expected_sibling_count, actual: self.siblings.len() });
         }
 
-
-        // 2. For each terminal compute the seed
-
-        // 3. Create bottom-to-top priority queue with Ord:
+        // 2. Create bottom-to-top priority queue with Ordering:
         //      a. Depth
-        //      b. Global sequence, for stability
+        //      b. Key sequence
+        // The key sequence sub-ordering ensures stability, so that multiple keys with the same
+        // depth are processed left-to-right.
+        let mut queue = BinaryHeap::new();
+
+        // 3. For each terminal add
+        for (i, terminal) in self.terminals.iter().enumerate() {
+            match terminal {
+                // CollapsedOther is impossible in multi-proofs that don't support exclusion.
+                ProofTerminal::CollapsedOther { .. } => return Err(SmtProofError::CollapsedOtherInMultiProof),
+                ProofTerminal::Full => queue.push(QueueItem {
+                    key: keys[i],
+                    depth: DEPTH as u8,
+                    key_index: i,
+                    value: leaf_hashes[i],
+                }),
+                ProofTerminal::Collapsed { depth } => queue.push(QueueItem {
+                    key: keys[i],
+                    depth: *depth,
+                    key_index: i,
+                    value: leaf_hashes[i],
+                })
+            };
+        }
+
 
         // 4. Iterate bottom-to-top combining branches using either sibling, or two-sided
         // knowns
