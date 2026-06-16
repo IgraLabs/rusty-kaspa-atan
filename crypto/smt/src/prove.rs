@@ -136,19 +136,23 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     fn proof_step(
         &self,
         bitmap: &mut MutableBitmap,
+        total_sibling_count: &mut usize,
         siblings: &mut Vec<Hash>,
         terminals: &mut HashMap<Hash, ProofTerminal>,
         keys: &[Hash],
         depth: usize,
     ) -> Result<(), ProveError<S>> {
         match self.get_branching_data(&keys[0], depth).map_err(ProveError::StoreError)? {
-            NodeBranchingData::Sibling(sibling) => match sibling {
-                None => bitmap.append(false),
-                Some(sibling_hash) => {
-                    bitmap.append(true);
-                    siblings.push(sibling_hash);
+            NodeBranchingData::Sibling(sibling) => {
+                *total_sibling_count += 1;
+                match sibling {
+                    None => bitmap.append(false),
+                    Some(sibling_hash) => {
+                        bitmap.append(true);
+                        siblings.push(sibling_hash);
+                    }
                 }
-            },
+            }
             NodeBranchingData::Terminal(proof_terminal) => {
                 if keys.len() != 1 {
                     return Err(ProveError::TerminalForMultipleKeys(keys.to_vec()));
@@ -164,6 +168,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
         let mut bitmap = MutableBitmap::new();
+        let mut total_sibling_count: usize = 0;
         let mut siblings = Vec::new();
         let mut terminals = HashMap::new();
 
@@ -184,10 +189,10 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
             let (left, right) = current.keys.split_at(split);
             // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
             if left.is_empty() {
-                self.proof_step(&mut bitmap, &mut siblings, &mut terminals, right, current.depth as usize)?;
+                self.proof_step(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, right, current.depth as usize)?;
                 queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
             } else if right.is_empty() {
-                self.proof_step(&mut bitmap, &mut siblings, &mut terminals, left, current.depth as usize)?;
+                self.proof_step(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, left, current.depth as usize)?;
                 queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
             } else {
                 queue.push_back(QueueItem { keys: left, depth: current.depth + 1 });
@@ -196,6 +201,6 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         }
 
         let terminals = keys.iter().map(|key| terminals.remove(key).unwrap_or(ProofTerminal::Full).clone()).collect();
-        Ok(OwnedSmtMultiProof { bitmap: bitmap.bitmap(), siblings, terminals })
+        Ok(OwnedSmtMultiProof { bitmap: bitmap.bitmap(), total_sibling_count, siblings, terminals })
     }
 }
