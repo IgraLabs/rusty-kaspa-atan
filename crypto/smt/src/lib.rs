@@ -68,7 +68,7 @@ pub fn are_siblings(this: &Hash, other: &Hash, d: usize) -> bool {
         }
     }
 
-    return bit_at(this, d) != bit_at(other, d);
+    bit_at(this, d) != bit_at(other, d)
 }
 
 /// Precompute empty subtree hashes at runtime for every level of the tree.

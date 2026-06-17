@@ -385,7 +385,6 @@ fn read_sibling_result<S: SmtStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proof::{OwnedSmtProof, ProofTerminal, SmtProofError};
     use alloc::vec;
     use kaspa_hashes::{HasherBase, SeqCommitActiveNode, ZERO_HASH};
     use rand::{Rng, SeedableRng, rngs::StdRng};

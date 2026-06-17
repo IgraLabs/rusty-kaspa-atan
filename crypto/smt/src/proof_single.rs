@@ -461,7 +461,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         let mut terminal = ProofTerminal::Full;
 
         for depth in 0..DEPTH {
-            match self.get_branching_data(&key, depth)? {
+            match self.get_branching_data(key, depth)? {
                 NodeBranchingData::Sibling(sibling) => match sibling {
                     None => {
                         bitmap[depth / 8] |= 1 << (depth % 8);
