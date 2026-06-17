@@ -31,7 +31,7 @@ pub enum SmtVerifyError {
     RootMismatch { expected: Hash, computed: Hash },
 
     #[error("proof error: {0}")]
-    ProofError(#[from] kaspa_smt::proof::SmtProofError),
+    ProofError(#[from] kaspa_smt::proof_single::SmtProofError),
 }
 
 /// Verify that the metadata is consistent with the header's `accepted_id_merkle_root` (= seq_commit).
@@ -49,8 +49,7 @@ pub fn verify_smt_metadata(
     }
 
     let activity_root = activity_root_hash(&inactivity_shortcut, metadata.lanes_root);
-    let state_root =
-        seq_state_root(&SeqState { activity_root: &activity_root, payload_and_ctx_digest: metadata.payload_and_ctx_digest });
+    let state_root = seq_state_root(&SeqState { activity_root: &activity_root, payload_and_ctx_digest: metadata.payload_and_ctx_digest });
     let computed = {
         let mut h = SeqCommitMerkleBranch::new();
         h.update(metadata.parent_seq_commit).update(state_root);
@@ -71,6 +70,7 @@ mod tests {
     use crate::types::{LaneId, SmtLeafInput};
     use kaspa_hashes::{SeqCommitActiveNode, ZERO_HASH};
     use kaspa_smt::proof::ProofBranchCache;
+    use kaspa_smt::proof_single::ProofBranchCache;
     use kaspa_smt::tree::SparseMerkleTree;
 
     type Smt = SparseMerkleTree<SeqCommitActiveNode>;
@@ -181,8 +181,7 @@ mod tests {
         let proof = tree.prove(&lk).unwrap();
 
         let mut branches = ProofBranchCache::new();
-        let ok =
-            proof.as_proof().verify_cached::<SeqCommitActiveNode>(&lk, Some(Hash::from_bytes([99; 32])), root, &mut branches).unwrap();
+        let ok = proof.as_proof().verify_cached::<SeqCommitActiveNode>(&lk, Some(Hash::from_bytes([99; 32])), root, &mut branches).unwrap();
         assert!(!ok);
     }
 
@@ -196,20 +195,14 @@ mod tests {
         let lk0 = lane_key(&lid(1));
         let proof0 = tree.prove(&lk0).unwrap();
         assert!(
-            proof0
-                .as_proof()
-                .verify_cached::<SeqCommitActiveNode>(&lk0, Some(lh(&lid(1), &tip(10), 100)), root, &mut branches)
-                .unwrap()
+            proof0.as_proof().verify_cached::<SeqCommitActiveNode>(&lk0, Some(lh(&lid(1), &tip(10), 100)), root, &mut branches).unwrap()
         );
         let after_first = branches.len();
 
         let lk1 = lane_key(&lid(2));
         let proof1 = tree.prove(&lk1).unwrap();
         assert!(
-            proof1
-                .as_proof()
-                .verify_cached::<SeqCommitActiveNode>(&lk1, Some(lh(&lid(2), &tip(20), 200)), root, &mut branches)
-                .unwrap()
+            proof1.as_proof().verify_cached::<SeqCommitActiveNode>(&lk1, Some(lh(&lid(2), &tip(20), 200)), root, &mut branches).unwrap()
         );
         assert!(branches.len() >= after_first);
         assert!(branches.len() < 512);

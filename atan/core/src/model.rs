@@ -4,7 +4,7 @@ use kaspa_consensus_core::BlueWorkType;
 use kaspa_consensus_core::tx::Transaction;
 use kaspa_hashes::Hash;
 use kaspa_seq_commit::types::LaneId;
-use kaspa_smt::proof::OwnedSmtProof;
+use kaspa_smt::proof_single::OwnedSmtProof;
 
 /// Represents a block in the selected parent chain.
 /// Including the MergesetContext and all information required to prove the ChainBlock's validity,
