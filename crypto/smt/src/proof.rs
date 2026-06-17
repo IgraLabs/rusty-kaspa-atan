@@ -43,7 +43,8 @@ use crate::store::{BranchKey, CollapsedLeaf};
 /// verifying multiple proofs against the same tree root. Upper branches are
 /// shared across proofs, so this can significantly reduce hashing work.
 pub type ProofBranchCache = alloc::collections::BTreeMap<BranchKey, Hash>;
-use crate::{bit_at, hash_node, SmtHasher, DEPTH};
+use crate::{DEPTH, SmtHasher, are_siblings, bit_at, hash_node};
+use crate::proof::SmtProofError::MoreSiblingsThenNeeded;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SmtProofError {
@@ -58,6 +59,8 @@ pub enum SmtProofError {
     #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof"
     )]
     CollapsedOtherInMultiProof,
+    #[error("There were more siblings provided then required to calculate root")]
+    MoreSiblingsThenNeeded,
 }
 
 /// Returns `true` if the sibling at depth `d` is empty (its bitmap bit is set),
@@ -136,7 +139,6 @@ fn bitmap_clear_count_before(bitmap: &[u8; 32], terminal: ProofTerminal) -> usiz
     let limit = terminal.depth();
     (0..limit).filter(|&d| !is_empty_at_depth(bitmap, d)).count()
 }
-
 
 /// Borrowed, zero-copy compressed proof for a 256-bit Sparse Merkle Tree.
 ///
@@ -448,14 +450,19 @@ pub struct OwnedSmtMultiProof {
 
 impl OwnedSmtMultiProof {
     pub fn as_proof(&self) -> SmtMultiProof<'_> {
-        SmtMultiProof { bitmap: &self.bitmap, total_sibling_count: self.total_sibling_count, siblings: &self.siblings, terminals: &self.terminals }
+        SmtMultiProof {
+            bitmap: &self.bitmap,
+            total_sibling_count: self.total_sibling_count,
+            siblings: &self.siblings,
+            terminals: &self.terminals,
+        }
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
 struct QueueItem {
     key: Hash,
-    depth: u8,
+    depth: usize,
     key_index: usize,
     value: Hash,
 }
@@ -465,9 +472,10 @@ impl Ord for QueueItem {
     }
 }
 
-
 impl PartialOrd for QueueItem {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl<'a> SmtMultiProof<'a> {
@@ -476,7 +484,7 @@ impl<'a> SmtMultiProof<'a> {
     /// The reconstruction respects [`self.terminal`](ProofTerminal) to determine the starting
     /// hash and loop depth. Returns an error if the sibling count doesn't match the bitmap.
     pub fn compute_root<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash]) -> Result<Hash, SmtProofError> {
-        self.compute_root_inner::<H>(keys, leaf_hashes, None)
+        self.compute_root_inner::<H>(keys, leaf_hashes)
     }
 
     /// Verify that the proof is consistent with the given `expected_root`.
@@ -484,22 +492,6 @@ impl<'a> SmtMultiProof<'a> {
     /// Equivalent to `self.compute_root(key, leaf_hash)? == expected_root`.
     pub fn verify<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], expected_root: Hash) -> Result<bool, SmtProofError> {
         Ok(self.compute_root::<H>(keys, leaf_hashes)? == expected_root)
-    }
-
-    /// Verify the proof while populating `cache` with intermediate branch hashes.
-    ///
-    /// Branches already in the cache are reused (skipping the hash computation),
-    /// and newly computed branches are inserted. This is useful when verifying
-    /// many proofs against the same tree, since upper branches are shared.
-    pub fn verify_cached<H: SmtHasher>(
-        &self,
-        keys: &[Hash],
-        leaf_hashes: &[Hash],
-        expected_root: Hash,
-        cache: &mut ProofBranchCache,
-    ) -> Result<bool, SmtProofError> {
-        let computed = self.compute_root_inner::<H>(keys, leaf_hashes, Some(cache))?;
-        Ok(computed == expected_root)
     }
 
     /// Reconstruct the Merkle root from a proof, optionally using a branch cache.
@@ -517,14 +509,10 @@ impl<'a> SmtMultiProof<'a> {
     ///
     /// After seeding `current`, the function hashes upward from `terminal.depth() - 1`
     /// to the root (depth 0), consuming siblings in reverse bitmap order.
-    ///
-    /// If `cache` is provided, each intermediate branch node is looked up before hashing;
-    /// cache hits skip the hash computation and new results are inserted.
     fn compute_root_inner<H: SmtHasher>(
         &self,
         keys: &[Hash],
         leaf_hashes: &[Hash],
-        mut cache: Option<&mut ProofBranchCache>,
     ) -> Result<Hash, SmtProofError> {
         // 0. Validate the counts of keys, leaf_hashes and terminals match
         if self.terminals.len() != keys.len() {
@@ -553,25 +541,46 @@ impl<'a> SmtMultiProof<'a> {
             match terminal {
                 // CollapsedOther is impossible in multi-proofs that don't support exclusion.
                 ProofTerminal::CollapsedOther { .. } => return Err(SmtProofError::CollapsedOtherInMultiProof),
-                ProofTerminal::Full => queue.push(QueueItem {
-                    key: keys[i],
-                    depth: DEPTH as u8,
-                    key_index: i,
-                    value: leaf_hashes[i],
-                }),
-                ProofTerminal::Collapsed { depth } => queue.push(QueueItem {
-                    key: keys[i],
-                    depth: *depth,
-                    key_index: i,
-                    value: leaf_hashes[i],
-                })
+                ProofTerminal::Full => queue.push(QueueItem { key: keys[i], depth: DEPTH, key_index: i, value: leaf_hashes[i] }),
+                ProofTerminal::Collapsed { depth } => {
+                    queue.push(QueueItem { key: keys[i], depth: *depth as usize, key_index: i, value: leaf_hashes[i] })
+                }
             };
         }
 
+        // 4. Iterate bottom-to-top combining branches using sibling sourced from either:
+        //      a. If this is a left branching node, the sibling branch might be inside the proof as well.
+        //         In such a case - it will be the next item in the queue.
+        let mut bitmap_index = 0;
+        let mut siblings_iter = self.siblings.iter();
 
-        // 4. Iterate bottom-to-top combining branches using either sibling, or two-sided
-        // knowns
-        todo!()
+        while !queue.is_empty() {
+            let current = queue.pop().unwrap();
+            let is_left = !bit_at(&current.key, current.depth);
+            // Only left keys might have their sibling branch inside the proof, in which case it is
+            // the next item in the queue.
+            let is_sibling_in_queue = is_left && queue.peek().is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
+            let sibling = if is_sibling_in_queue {
+                queue.pop().unwrap().value
+            } else {
+                if bitmap_index == self.bitmap.len() * 8 {
+                    return Ok(current.value);
+                }
+                let is_sibling_zero = self.bitmap_value_at_index(bitmap_index);
+                bitmap_index += 1;
+                if is_sibling_zero { H::EMPTY_HASHES[DEPTH - 1 - current.depth] } else { *(siblings_iter.next().unwrap()) }
+            };
+            queue.push(QueueItem {
+                key: current.key,
+                depth: current.depth - 1,
+                key_index: current.key_index,
+                value: hash_node::<H>(current.value, sibling),
+            })
+        }
+        Err(MoreSiblingsThenNeeded)
+    }
+
+    fn bitmap_value_at_index(&self, index: usize) -> bool {
+        self.bitmap[index / 8] & (1 << (index % 8)) != 0
     }
 }
-

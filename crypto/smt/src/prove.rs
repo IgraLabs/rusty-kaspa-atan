@@ -1,7 +1,7 @@
 use crate::proof::{OwnedSmtMultiProof, OwnedSmtProof, ProofTerminal};
 use crate::store::{BranchKey, Node, SmtStore};
-use crate::tree::{child_branch_key, SparseMerkleTree};
-use crate::{bit_at, hash_node, SmtHasher, DEPTH};
+use crate::tree::{SparseMerkleTree, child_branch_key};
+use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 use kaspa_hashes::Hash;
 use std::collections::{HashMap, VecDeque};
 use std::prelude::rust_2015::Vec;
@@ -178,11 +178,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         }
         let mut queue = VecDeque::new();
         queue.push_back(QueueItem { keys, depth: 0 });
-        loop {
-            if queue.is_empty() {
-                // This means we have finished traversing all nodes
-                break;
-            }
+        while !queue.is_empty() {
             let current = queue.pop_front().unwrap();
 
             let split = current.keys.partition_point(|hash| bit_at(hash, current.depth as usize) == true);
