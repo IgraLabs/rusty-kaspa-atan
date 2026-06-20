@@ -96,21 +96,6 @@ pub enum SmtMultiProofError {
 }
 
 impl<'a> SmtMultiProof<'a> {
-    /// Reconstructs the Merkle root that this proof implies for `keys` and given leaf_hashes.
-    ///
-    /// The reconstruction respects [`self.terminal`](ProofTerminal) to determine the starting
-    /// hash and loop depth. Returns an error if the sibling count doesn't match the bitmap.
-    pub fn compute_root<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash]) -> Result<Hash, SmtMultiProofError> {
-        self.compute_root_inner::<H>(keys, leaf_hashes)
-    }
-
-    /// Verify that the proof is consistent with the given `expected_root`.
-    ///
-    /// Equivalent to `self.compute_root(key, leaf_hash)? == expected_root`.
-    pub fn verify<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], expected_root: Hash) -> Result<bool, SmtMultiProofError> {
-        Ok(self.compute_root::<H>(keys, leaf_hashes)? == expected_root)
-    }
-
     /// Reconstruct the Merkle root from a proof, optionally using a branch cache.
     ///
     /// # Terminal-dependent initial state
@@ -126,11 +111,7 @@ impl<'a> SmtMultiProof<'a> {
     ///
     /// After seeding `current`, the function hashes upward from `terminal.depth() - 1`
     /// to the root (depth 0), consuming siblings in reverse bitmap order.
-    fn compute_root_inner<H: SmtHasher>(
-        &self,
-        keys: &[Hash],
-        leaf_hashes: &[Hash],
-    ) -> Result<Hash, SmtMultiProofError> {
+    pub fn compute_root<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash]) -> Result<Hash, SmtMultiProofError> {
         // 1. Validate the counts of keys, leaf_hashes and terminals match
         if self.terminals.len() != keys.len() {
             return Err(SmtMultiProofError::KeyCountMismatch { expected: self.terminals.len(), actual: keys.len() });
@@ -193,6 +174,13 @@ impl<'a> SmtMultiProof<'a> {
             })
         }
         Err(SmtMultiProofError::MoreSiblingsThenNeeded)
+    }
+
+    /// Verify that the proof is consistent with the given `expected_root`.
+    ///
+    /// Equivalent to `self.compute_root(key, leaf_hash)? == expected_root`.
+    pub fn verify<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], expected_root: Hash) -> Result<bool, SmtMultiProofError> {
+        Ok(self.compute_root::<H>(keys, leaf_hashes)? == expected_root)
     }
 
     fn bitmap_value_at_index(&self, index: usize) -> bool {
