@@ -210,7 +210,7 @@ impl MutableBitmap {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Clone)]
 pub enum ProveError<S: SmtStore> {
     #[error("Store error: {0}")]
     StoreError(S::Error),
@@ -218,6 +218,18 @@ pub enum ProveError<S: SmtStore> {
     TerminalForMultipleKeys(Vec<Hash>),
     #[error("Empty subtree for key: {0}")]
     EmptySubtreeKey(Hash),
+}
+
+// Manual `Debug` impl: the derive would add a spurious `S: Debug` bound, even though
+// only `S::Error` appears in the variants (and `SmtStore::Error: Debug` is already guaranteed).
+impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StoreError(e) => f.debug_tuple("StoreError").field(e).finish(),
+            Self::TerminalForMultipleKeys(keys) => f.debug_tuple("TerminalForMultipleKeys").field(keys).finish(),
+            Self::EmptySubtreeKey(key) => f.debug_tuple("EmptySubtreeKey").field(key).finish(),
+        }
+    }
 }
 
 
@@ -287,5 +299,31 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
         let terminals = keys.iter().map(|key| terminals.remove(key).unwrap_or(ProofTerminal::Full)).collect();
         Ok(OwnedSmtMultiProof { bitmap: bitmap.bitmap(), total_sibling_count, siblings, terminals })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::vec;
+    use zerocopy::IntoBytes;
+    use crate::tree::tests::{test_key, test_leaf, Smt, TestHasher};
+
+    #[test]
+    fn test_multi_proof() {
+        let mut tree = Smt::new();
+        let mut proof_keys = vec![];
+        let mut proof_leaf_hashes = vec![];
+        for i in 0..1000u32 {
+            let key = test_key(i.as_bytes());
+            let value = test_leaf(i.as_bytes());
+            tree.insert(key, value);
+
+            if i.is_multiple_of(3) {
+                proof_keys.push(key);
+                proof_leaf_hashes.push(value);
+            }
+        }
+        let proof = tree.prove_multiple(&proof_keys).unwrap();
+        assert!(proof.as_proof().verify::<TestHasher>(&proof_keys, &proof_leaf_hashes, tree.root()).unwrap(), "multi_proof failed");
     }
 }

@@ -383,15 +383,15 @@ fn read_sibling_result<S: SmtStore>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use alloc::vec;
     use kaspa_hashes::{HasherBase, SeqCommitActiveNode, ZERO_HASH};
     use rand::{Rng, SeedableRng, rngs::StdRng};
     use crate::proof_single::{OwnedSmtProof, ProofTerminal, SmtProofError};
 
-    type TestHasher = SeqCommitActiveNode;
-    type Smt = SparseMerkleTree<TestHasher>;
+    pub(crate) type TestHasher = SeqCommitActiveNode;
+    pub(crate) type Smt = SparseMerkleTree<TestHasher>;
 
     // ---- Helpers ----
 
@@ -399,14 +399,14 @@ mod tests {
         SortedLeafUpdates::from_unsorted(entries.into_iter().map(|(key, leaf_hash)| LeafUpdate { key, leaf_hash }))
     }
 
-    fn test_key(seed: &[u8]) -> Hash {
+    pub(crate) fn test_key(seed: &[u8]) -> Hash {
         let mut h = TestHasher::default();
         h.update(b"test_key:");
         h.update(seed);
         h.finalize()
     }
 
-    fn test_leaf(seed: &[u8]) -> Hash {
+    pub(crate) fn test_leaf(seed: &[u8]) -> Hash {
         let mut h = TestHasher::default();
         h.update(b"test_leaf:");
         h.update(seed);
