@@ -234,8 +234,7 @@ pub enum ProveError<S: SmtStore> {
 
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
-    // TODO: find better name for this function
-    fn proof_step(
+    fn add_next_sibling_to_proof(
         &self,
         bitmap: &mut MutableBitmap,
         total_sibling_count: &mut usize,
@@ -287,10 +286,10 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
             let (left, right) = current.keys.split_at(split);
             // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
             if left.is_empty() {
-                self.proof_step(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, right, current.depth as usize)?;
+                self.add_next_sibling_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, right, current.depth as usize)?;
                 queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
             } else if right.is_empty() {
-                self.proof_step(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, left, current.depth as usize)?;
+                self.add_next_sibling_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, left, current.depth as usize)?;
                 queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
             } else {
                 queue.push_back(QueueItem { keys: left, depth: current.depth + 1 });
