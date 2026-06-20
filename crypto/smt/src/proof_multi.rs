@@ -189,24 +189,24 @@ impl<'a> SmtMultiProof<'a> {
 }
 struct MutableBitmap {
     bitmap: Vec<u8>,
-    current_index: usize,
+    next_index: usize,
 }
 impl MutableBitmap {
     fn new() -> Self {
-        Self { bitmap: Vec::new(), current_index: 0 }
+        Self { bitmap: Vec::new(), next_index: 0 }
     }
     fn bitmap(self) -> Vec<u8> {
         self.bitmap
     }
 
     fn append(&mut self, value: bool) {
-        self.current_index += 1;
-        if self.current_index.is_multiple_of(8) {
+        if self.next_index.is_multiple_of(8) {
             self.bitmap.push(0);
         }
         if value {
-            self.bitmap[self.current_index / 8] |= 1 << (self.current_index % 8);
+            self.bitmap[self.next_index / 8] |= 1 << (self.next_index % 8);
         }
+        self.next_index += 1;
     }
 }
 
