@@ -112,6 +112,11 @@ pub trait SmtHasher: Hasher {
     fn empty_root() -> Hash {
         Self::EMPTY_HASHES[DEPTH]
     }
+
+    #[inline]
+    fn empty_hash_at_depth(depth: usize) -> Hash {
+        Self::EMPTY_HASHES[DEPTH - 1 - depth]
+    }
 }
 
 // Build-time generated `SmtHasher` impls for known hashers.

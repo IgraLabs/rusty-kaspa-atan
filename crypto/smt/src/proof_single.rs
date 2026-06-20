@@ -231,7 +231,7 @@ impl<'a> SmtProof<'a> {
         // BranchKey::new(d as u8, ..): d < 256, so u8 cast is safe.
         for d in (0..limit).rev() {
             let sibling = if is_empty_at_depth(self.bitmap, d) {
-                H::EMPTY_HASHES[DEPTH - 1 - d]
+                H::empty_hash_at_depth(d)
             } else {
                 sib_idx -= 1;
                 self.siblings[sib_idx]

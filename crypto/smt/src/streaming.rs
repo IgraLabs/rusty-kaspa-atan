@@ -225,9 +225,7 @@ impl<H: SmtHasher, S: MergeSink> StreamingSmtBuilder<H, S> {
     }
 
     fn seal_up_to(&mut self, current: &mut StackEntry, target_depth: usize) -> Result<(), StreamError<S::Error>> {
-        while let Some(&StackEntry { depth: top_depth, .. }) = self.stack.last()
-            && top_depth >= target_depth
-        {
+        while let Some(&StackEntry { depth: top_depth, .. }) = self.stack.last() && top_depth >= target_depth {
             if current.depth > top_depth {
                 self.chain_up(current, top_depth)?;
             }
@@ -261,16 +259,13 @@ impl<H: SmtHasher, S: MergeSink> StreamingSmtBuilder<H, S> {
             EntryKind::Internal => {
                 let chain_to = target_depth + 1;
                 if current.depth > chain_to {
-                    current.hash = self
-                        .sink
-                        .merge_chain_with_empty(
-                            current.hash,
-                            current.depth,
-                            chain_to,
-                            &current.representative_key,
-                            current.max_blue_score,
-                        )
-                        .map_err(StreamError::Sink)?;
+                    current.hash = self.sink.merge_chain_with_empty(
+                        current.hash,
+                        current.depth,
+                        chain_to,
+                        &current.representative_key,
+                        current.max_blue_score,
+                    ).map_err(StreamError::Sink)?;
                 }
                 current.depth = target_depth;
             }
@@ -292,10 +287,7 @@ impl<H: SmtHasher, S: MergeSink> StreamingSmtBuilder<H, S> {
 
         let parent_blue_score = left.max_blue_score.max(current.max_blue_score);
 
-        let result = self
-            .sink
-            .merge(left.hash, current.hash, parent_key, left_info, right_info, parent_blue_score)
-            .map_err(StreamError::Sink)?;
+        let result = self.sink.merge(left.hash, current.hash, parent_key, left_info, right_info, parent_blue_score).map_err(StreamError::Sink)?;
 
         if merge_depth == 0 {
             self.root_written = true;
@@ -329,10 +321,7 @@ impl<H: SmtHasher, S: MergeSink> StreamingSmtBuilder<H, S> {
                 if self.root_written {
                     self.root = Some(current.hash);
                 } else {
-                    let result = self
-                        .sink
-                        .merge_chain_with_empty(current.hash, 1, 0, &current.representative_key, current.max_blue_score)
-                        .map_err(StreamError::Sink)?;
+                    let result = self.sink.merge_chain_with_empty(current.hash, 1, 0, &current.representative_key, current.max_blue_score).map_err(StreamError::Sink)?;
                     self.root = Some(result);
                 }
             }
@@ -417,9 +406,8 @@ mod tests {
             let mut current_hash = hash;
 
             for d in (to_depth..from_depth).rev() {
-                let height = DEPTH - 1 - d;
                 let goes_right = bit_at(representative_key, d);
-                let empty_h = H::EMPTY_HASHES[height];
+                let empty_h = H::empty_hash_at_depth(d);
                 let (left_h, right_h) = if goes_right { (empty_h, current_hash) } else { (current_hash, empty_h) };
                 current_hash = hash_node::<H>(left_h, right_h);
                 let bk = BranchKey::new(d as u8, representative_key);
@@ -514,15 +502,13 @@ mod tests {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         for count in [2, 3, 5, 7, 10, 16, 32, 50] {
-            let leaves: Vec<(Hash, Hash)> = (0..count)
-                .map(|_| {
-                    let mut k = [0u8; 32];
-                    let mut v = [0u8; 32];
-                    rng.fill(&mut k);
-                    rng.fill(&mut v);
-                    (Hash::from_bytes(k), Hash::from_bytes(v))
-                })
-                .collect();
+            let leaves: Vec<(Hash, Hash)> = (0..count).map(|_| {
+                let mut k = [0u8; 32];
+                let mut v = [0u8; 32];
+                rng.fill(&mut k);
+                rng.fill(&mut v);
+                (Hash::from_bytes(k), Hash::from_bytes(v))
+            }).collect();
             check(&leaves);
         }
     }
@@ -532,15 +518,13 @@ mod tests {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         for count in [100, 500, 1000] {
-            let leaves: Vec<(Hash, Hash)> = (0..count)
-                .map(|_| {
-                    let mut k = [0u8; 32];
-                    let mut v = [0u8; 32];
-                    rng.fill(&mut k);
-                    rng.fill(&mut v);
-                    (Hash::from_bytes(k), Hash::from_bytes(v))
-                })
-                .collect();
+            let leaves: Vec<(Hash, Hash)> = (0..count).map(|_| {
+                let mut k = [0u8; 32];
+                let mut v = [0u8; 32];
+                rng.fill(&mut k);
+                rng.fill(&mut v);
+                (Hash::from_bytes(k), Hash::from_bytes(v))
+            }).collect();
             check(&leaves);
         }
     }

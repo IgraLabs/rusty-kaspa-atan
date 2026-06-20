@@ -131,14 +131,14 @@ impl<'a> SmtMultiProof<'a> {
         keys: &[Hash],
         leaf_hashes: &[Hash],
     ) -> Result<Hash, SmtMultiProofError> {
-        // 0. Validate the counts of keys, leaf_hashes and terminals match
+        // 1. Validate the counts of keys, leaf_hashes and terminals match
         if self.terminals.len() != keys.len() {
             return Err(SmtMultiProofError::KeyCountMismatch { expected: self.terminals.len(), actual: keys.len() });
         }
         if self.terminals.len() != leaf_hashes.len() {
             return Err(SmtMultiProofError::LeafHashesCountMismatch { expected: self.terminals.len(), actual: leaf_hashes.len() });
         }
-        // 1. Validate sibling count
+        // 2. Validate sibling count
         let zero_bits: usize = self.bitmap.iter().map(|byte| byte.count_zeros() as usize).sum();
         let trailing_bits = 8 - (self.total_sibling_count % 8);
         let expected_sibling_count = zero_bits - trailing_bits;
@@ -146,14 +146,14 @@ impl<'a> SmtMultiProof<'a> {
             return Err(SmtMultiProofError::SiblingCountMismatch { expected: expected_sibling_count, actual: self.siblings.len() });
         }
 
-        // 2. Create bottom-to-top priority queue with Ordering:
+        // 3. Create bottom-to-top priority queue with Ordering:
         //      a. Depth
         //      b. Key sequence
         // The key sequence sub-ordering ensures stability, so that multiple keys with the same
         // depth are processed left-to-right.
         let mut queue = BinaryHeap::new();
 
-        // 3. For each terminal add
+        // 4. For each terminal add an item to the queue
         for (i, terminal) in self.terminals.iter().enumerate() {
             match terminal {
                 // CollapsedOther is impossible in multi-proofs that don't support exclusion.
@@ -165,17 +165,15 @@ impl<'a> SmtMultiProof<'a> {
             };
         }
 
-        // 4. Iterate bottom-to-top combining branches using sibling sourced from either:
-        //      a. If this is a left branching node, the sibling branch might be inside the proof as well.
-        //         In such a case - it will be the next item in the queue.
+        // 5. Iterate bottom-to-top combining branches using sibling sourced from either:
         let mut bitmap_index = 0;
         let mut siblings_iter = self.siblings.iter();
 
         while !queue.is_empty() {
             let current = queue.pop().unwrap();
             let is_left = !bit_at(&current.key, current.depth);
-            // Only left keys might have their sibling branch inside the proof, in which case it is
-            // the next item in the queue.
+            // If this is a left branching node, the sibling branch might be inside the proof as well.
+            // In such a case - it will be the next item in the queue.
             let is_sibling_in_queue = is_left && queue.peek().is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
             let sibling = if is_sibling_in_queue {
                 queue.pop().unwrap().value
@@ -185,7 +183,7 @@ impl<'a> SmtMultiProof<'a> {
                 }
                 let is_sibling_zero = self.bitmap_value_at_index(bitmap_index);
                 bitmap_index += 1;
-                if is_sibling_zero { H::EMPTY_HASHES[DEPTH - 1 - current.depth] } else { *(siblings_iter.next().unwrap()) }
+                if is_sibling_zero { H::empty_hash_at_depth(current.depth) } else { *(siblings_iter.next().unwrap()) }
             };
             queue.push(QueueItem {
                 key: current.key,

@@ -32,7 +32,7 @@ pub struct SparseMerkleTree<H: SmtHasher, S: SmtStore = BTreeSmtStore> {
 impl<H: SmtHasher> SparseMerkleTree<H, BTreeSmtStore> {
     /// Create a new empty sparse Merkle tree with the default in-memory store.
     pub fn new() -> Self {
-        Self { store: BTreeSmtStore::new(), root: H::EMPTY_HASHES[DEPTH], _phantom: PhantomData }
+        Self { store: BTreeSmtStore::new(), root: H::empty_root(), _phantom: PhantomData }
     }
 }
 
@@ -50,7 +50,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
     /// Create a new empty sparse Merkle tree with a custom store.
     pub fn with_store(store: S) -> Self {
-        Self { store, root: H::EMPTY_HASHES[DEPTH], _phantom: PhantomData }
+        Self { store, root: H::empty_root(), _phantom: PhantomData }
     }
 
     /// Consume the tree and return the underlying store.
@@ -139,7 +139,7 @@ impl NodeResult {
     /// yielding indices 255..=0, all within the 257-element array.
     fn hash<H: SmtHasher>(&self, parent_depth: usize) -> Hash {
         match self {
-            NodeResult::Empty => H::EMPTY_HASHES[DEPTH - 1 - parent_depth],
+            NodeResult::Empty => H::empty_hash_at_depth(parent_depth),
             NodeResult::Collapsed(cl) => hash_node::<H::CollapsedHasher>(cl.lane_key, cl.leaf_hash),
             NodeResult::Internal { hash } => *hash,
         }
