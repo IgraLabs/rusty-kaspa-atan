@@ -218,6 +218,8 @@ pub enum ProveError<S: SmtStore> {
     TerminalForMultipleKeys(Vec<Hash>),
     #[error("Empty subtree for key: {0}")]
     EmptySubtreeKey(Hash),
+    #[error("Keys are not sorted")]
+    KeysNotSorted,
 }
 
 // Manual `Debug` impl: the derive would add a spurious `S: Debug` bound, even though
@@ -228,6 +230,7 @@ impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
             Self::StoreError(e) => f.debug_tuple("StoreError").field(e).finish(),
             Self::TerminalForMultipleKeys(keys) => f.debug_tuple("TerminalForMultipleKeys").field(keys).finish(),
             Self::EmptySubtreeKey(key) => f.debug_tuple("EmptySubtreeKey").field(key).finish(),
+            Self::KeysNotSorted => f.debug_tuple("KeysNotSorted").finish(),
         }
     }
 }
@@ -268,6 +271,9 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     }
 
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
+        if !keys.is_sorted() {
+            return Err(ProveError::KeysNotSorted);
+        }
         let mut bitmap = MutableBitmap::new();
         let mut total_sibling_count: usize = 0;
         let mut siblings = Vec::new();
@@ -323,6 +329,7 @@ mod tests {
                 proof_leaf_hashes.push(value);
             }
         }
+        proof_keys.sort();
         let proof = tree.prove_multiple(&proof_keys).unwrap();
         assert!(proof.as_proof().verify::<TestHasher>(&proof_keys, &proof_leaf_hashes, tree.root()).unwrap(), "multi_proof failed");
     }
