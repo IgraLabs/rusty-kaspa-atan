@@ -288,7 +288,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         while !queue.is_empty() {
             let current = queue.pop_front().unwrap();
 
-            let split = current.keys.partition_point(|hash| bit_at(hash, current.depth as usize));
+            let split = current.keys.partition_point(|key| !bit_at(key, current.depth as usize));
             let (left, right) = current.keys.split_at(split);
             // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
             if left.is_empty() {
