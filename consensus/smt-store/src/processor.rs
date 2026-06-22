@@ -16,16 +16,6 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use kaspa_database::prelude::{BatchDbWriter, DB, DirectDbWriter, StoreError, StoreResult};
-use kaspa_hashes::{Hash, SeqCommitActiveNode, ZERO_HASH};
-use kaspa_seq_commit::hashing::smt_leaf_hash;
-use kaspa_seq_commit::types::SmtLeafInput;
-use kaspa_smt::store::{BranchKey, CollapsedLeaf, Node, SmtStore, SortedLeafUpdates};
-use kaspa_smt::streaming::{ChildInfo, MergeSink, StreamError, StreamingSmtBuilder};
-use kaspa_smt::tree::{SmtNodeChanges, SparseMerkleTree, compute_root_update};
-use kaspa_smt::{SmtHasher, bit_at, hash_node};
-use rocksdb::WriteBatch;
-use kaspa_smt::proof_single::OwnedSmtProof;
 use crate::branch_version_store::DbBranchVersionStore;
 use crate::cache::{BranchEntity, BranchVersionCache, LaneVersionCache};
 use crate::lane_version_store::DbLaneVersionStore;
@@ -33,6 +23,16 @@ use crate::maybe_fork::Verified;
 use crate::score_index::DbScoreIndex;
 use crate::values::LaneTipHash;
 use crate::{BlockHash, LaneKey};
+use kaspa_database::prelude::{BatchDbWriter, DB, DirectDbWriter, StoreError, StoreResult};
+use kaspa_hashes::{Hash, SeqCommitActiveNode, ZERO_HASH};
+use kaspa_seq_commit::hashing::smt_leaf_hash;
+use kaspa_seq_commit::types::SmtLeafInput;
+use kaspa_smt::proof_single::OwnedSmtProof;
+use kaspa_smt::store::{BranchKey, CollapsedLeaf, Node, SmtStore, SortedLeafUpdates};
+use kaspa_smt::streaming::{ChildInfo, MergeSink, StreamError, StreamingSmtBuilder};
+use kaspa_smt::tree::{SmtNodeChanges, SparseMerkleTree, compute_root_update};
+use kaspa_smt::{SmtHasher, bit_at, hash_node};
+use rocksdb::WriteBatch;
 
 struct VersionedBranchReader<'a, F: Fn(Hash) -> bool> {
     stores: &'a SmtStores,
@@ -187,11 +187,14 @@ impl SmtStores {
         bounds: SmtReadBounds,
         mut is_canonical: impl FnMut(Hash) -> bool,
     ) -> Option<Verified<Option<Node>>> {
-        if let Some((score, block_hash, value)) = self.branch_cache.lock().get(entity, bounds.target_blue_score, bounds.min_blue_score, &mut is_canonical)
+        if let Some((score, block_hash, value)) =
+            self.branch_cache.lock().get(entity, bounds.target_blue_score, bounds.min_blue_score, &mut is_canonical)
         {
             return Some(Verified::new(*value, score, block_hash));
         }
-        self.branch_version.get_at_canonical(entity.depth, entity.node_key, bounds.target_blue_score, bounds.min_blue_score, is_canonical).unwrap()
+        self.branch_version
+            .get_at_canonical(entity.depth, entity.node_key, bounds.target_blue_score, bounds.min_blue_score, is_canonical)
+            .unwrap()
     }
 
     /// Find the latest canonical lane version in `[min_blue_score, target_blue_score]`,
@@ -206,7 +209,8 @@ impl SmtStores {
         bounds: SmtReadBounds,
         mut is_canonical: impl FnMut(Hash) -> bool,
     ) -> Option<Verified<LaneTipHash>> {
-        if let Some((score, block_hash, value)) = self.lane_cache.lock().get(lane_key, bounds.target_blue_score, bounds.min_blue_score, &mut is_canonical)
+        if let Some((score, block_hash, value)) =
+            self.lane_cache.lock().get(lane_key, bounds.target_blue_score, bounds.min_blue_score, &mut is_canonical)
         {
             return Some(Verified::new(*value, score, block_hash));
         }
@@ -237,7 +241,8 @@ impl SmtStores {
         total_count: u64,
         is_canonical: impl Fn(Hash) -> bool,
     ) -> StoreResult<(Hash, u64)> {
-        let mut builder = StreamingSmtBuilder::<SeqCommitActiveNode, _>::new(total_count, RootOnlyMergeSink::<SeqCommitActiveNode>::default());
+        let mut builder =
+            StreamingSmtBuilder::<SeqCommitActiveNode, _>::new(total_count, RootOnlyMergeSink::<SeqCommitActiveNode>::default());
         let mut count = 0u64;
 
         for lane in self.lane_version.iter_all_canonical(None, bounds.min_blue_score, Some(bounds.target_blue_score), is_canonical) {
@@ -450,11 +455,12 @@ impl BlockLaneChanges {
         batch: &mut WriteBatch,
         block_hash: BlockHash,
         max_depth: u8,
-        structural_extra: impl IntoIterator<Item=LaneKey>,
+        structural_extra: impl IntoIterator<Item = LaneKey>,
     ) -> StoreResult<()> {
         use crate::keys::ScoreIndexKind;
         let updated: Vec<LaneKey> = self.changes.iter().filter_map(|(k, v)| v.as_ref().map(|_| *k)).collect();
-        let structural: Vec<LaneKey> = self.changes.iter().filter_map(|(k, v)| if v.is_none() { Some(*k) } else { None }).chain(structural_extra).collect();
+        let structural: Vec<LaneKey> =
+            self.changes.iter().filter_map(|(k, v)| if v.is_none() { Some(*k) } else { None }).chain(structural_extra).collect();
         if !updated.is_empty() {
             stores.score_index.put(
                 BatchDbWriter::new(batch),
@@ -598,7 +604,12 @@ impl SmtBuild {
         // write is unconditional); cl.lane_key is X. Filter out lanes the
         // block already touched — those are covered by the `LeafUpdate` /
         // base structural sets — and add the rest.
-        let promoted_lane_keys: BTreeSet<LaneKey> = self.node_changes.values().filter_map(|n| if let Some(Node::Collapsed(cl)) = n { Some(cl.lane_key) } else { None }).filter(|lk| !self.lane_changes.changes.contains_key(lk)).collect();
+        let promoted_lane_keys: BTreeSet<LaneKey> = self
+            .node_changes
+            .values()
+            .filter_map(|n| if let Some(Node::Collapsed(cl)) = n { Some(cl.lane_key) } else { None })
+            .filter(|lk| !self.lane_changes.changes.contains_key(lk))
+            .collect();
         self.lane_changes.flush_score_index(stores, batch, block_hash, max_depth, promoted_lane_keys)?;
 
         Ok(root)
@@ -673,7 +684,9 @@ mod tests {
 
         // Query from the POV of a chain whose canonical entry for E is the
         // pre-restart DB-only version at 200.
-        let got = stores.get_node(e, bounds(300, 0), |bh| bh == pre_restart_bh).expect("pre-restart canonical DB entry above the cache's oldest must still be returned");
+        let got = stores
+            .get_node(e, bounds(300, 0), |bh| bh == pre_restart_bh)
+            .expect("pre-restart canonical DB entry above the cache's oldest must still be returned");
         assert_eq!(got.blue_score(), 200, "must return the DB entry at blue_score 200 above the cache's (100, post-restart-bh)");
         assert_eq!(got.block_hash(), pre_restart_bh);
         assert_eq!(*got.data(), pre_restart_node);
@@ -701,7 +714,9 @@ mod tests {
         stores.lane_version.put(DirectDbWriter::new(&db), lane_key, 100, post_restart_bh, &post_restart_tip).unwrap();
         stores.lane_cache.lock().insert(lane_key, 100, post_restart_bh, post_restart_tip);
 
-        let got = stores.get_lane(lane_key, bounds(300, 0), |bh| bh == pre_restart_bh).expect("pre-restart canonical DB lane entry above the cache's oldest must still be returned");
+        let got = stores
+            .get_lane(lane_key, bounds(300, 0), |bh| bh == pre_restart_bh)
+            .expect("pre-restart canonical DB lane entry above the cache's oldest must still be returned");
         assert_eq!(got.blue_score(), 200);
         assert_eq!(got.block_hash(), pre_restart_bh);
         assert_eq!(*got.data(), pre_restart_tip);

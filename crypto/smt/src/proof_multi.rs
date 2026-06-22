@@ -1,12 +1,12 @@
+use crate::proof_single::{NodeBranchingData, ProofTerminal};
+use crate::store::SmtStore;
+use crate::tree::SparseMerkleTree;
+use crate::{DEPTH, SmtHasher, are_siblings, bit_at, hash_node};
+use kaspa_hashes::Hash;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::prelude::rust_2015::Vec;
 use thiserror::Error;
-use kaspa_hashes::Hash;
-use crate::proof_single::{NodeBranchingData, ProofTerminal};
-use crate::{are_siblings, bit_at, hash_node, SmtHasher, DEPTH};
-use crate::store::SmtStore;
-use crate::tree::SparseMerkleTree;
 
 /// Borrowed, zero-copy compressed multi-lane proof for a 256-bit Sparse Merkle Tree.
 ///
@@ -80,19 +80,16 @@ impl PartialOrd for QueueItem {
 
 #[derive(Error, Debug, Clone)]
 pub enum SmtMultiProofError {
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
-    )]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
     SiblingCountMismatch { expected: usize, actual: usize },
     #[error("key count mismatch: expected {expected} keys, but got {actual}")]
     KeyCountMismatch { expected: usize, actual: usize },
     #[error("leaf hashes count mismatch: expected {expected} leaf hashes, but got {actual}")]
     LeafHashesCountMismatch { expected: usize, actual: usize },
-    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof"
-    )]
+    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof")]
     CollapsedOtherInMultiProof,
     #[error("There were more siblings provided then required to calculate root")]
     MoreSiblingsThenNeeded,
-
 }
 
 impl<'a> SmtMultiProof<'a> {
@@ -141,7 +138,10 @@ impl<'a> SmtMultiProof<'a> {
             let is_left = !bit_at(&current.key, current.depth);
             // If this is a left branching node, the sibling branch might be inside the proof as well.
             // In such a case - it will be the next item in the queue.
-            let is_sibling_in_queue = is_left && queue.peek().is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
+            let is_sibling_in_queue = is_left
+                && queue
+                    .peek()
+                    .is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
             let sibling = if is_sibling_in_queue {
                 queue.pop().unwrap().value
             } else {
@@ -219,11 +219,12 @@ impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
             Self::TerminalForMultipleKeys(keys) => f.debug_tuple("TerminalForMultipleKeys").field(keys).finish(),
             Self::EmptySubtreeKey(key) => f.debug_tuple("EmptySubtreeKey").field(key).finish(),
             Self::KeysNotSorted => f.debug_tuple("KeysNotSorted").finish(),
-            Self::CollapsedOtherInMultiProof(proof_terminal) => f.debug_tuple("CollapsedOtherInMultiProof").field(proof_terminal).finish(),
+            Self::CollapsedOtherInMultiProof(proof_terminal) => {
+                f.debug_tuple("CollapsedOtherInMultiProof").field(proof_terminal).finish()
+            }
         }
     }
 }
-
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     /// TODO: comment
@@ -249,12 +250,26 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
             let (left, right) = current.keys.split_at(split);
             // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
             if left.is_empty() {
-                let is_terminal = self.add_next_step_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, right, current.depth as usize)?;
+                let is_terminal = self.add_next_step_to_proof(
+                    &mut bitmap,
+                    &mut total_sibling_count,
+                    &mut siblings,
+                    &mut terminals,
+                    right,
+                    current.depth as usize,
+                )?;
                 if !is_terminal {
                     queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
                 }
             } else if right.is_empty() {
-                let is_terminal = self.add_next_step_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, left, current.depth as usize)?;
+                let is_terminal = self.add_next_step_to_proof(
+                    &mut bitmap,
+                    &mut total_sibling_count,
+                    &mut siblings,
+                    &mut terminals,
+                    left,
+                    current.depth as usize,
+                )?;
                 if !is_terminal {
                     queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
                 }
@@ -317,9 +332,9 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
 #[cfg(test)]
 mod tests {
+    use crate::tree::tests::{Smt, TestHasher, test_key, test_leaf};
     use std::vec;
     use zerocopy::IntoBytes;
-    use crate::tree::tests::{test_key, test_leaf, Smt, TestHasher};
 
     #[test]
     fn test_multi_proof() {

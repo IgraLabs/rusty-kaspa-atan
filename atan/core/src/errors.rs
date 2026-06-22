@@ -1,8 +1,8 @@
 use kaspa_hashes::Hash;
 use kaspa_seq_commit::types::LaneId;
+use kaspa_smt::proof_single::SmtProofError;
 use std::fmt::{Debug, Display};
 use thiserror::Error;
-use kaspa_smt::proof_single::SmtProofError;
 
 pub type AtanResult<T> = Result<T, AtanError>;
 
@@ -28,11 +28,11 @@ pub enum ValidationError {
     InvalidLaneID(Expected<LaneId>, Actual<LaneId>),
     #[error("ActiveLanesRoot doesn't match: For lane {0:?} it's {1}; For lane {2:?} it's {3}")]
     UnmatchingActiveLanesRootForDifferentLanes(LaneId, Hash, LaneId, Hash),
-    #[error("Recent block invalid because it doesn't connect to existing chain: Expected selected parent sequencing commitment: {0}. Actual: {1}"
+    #[error(
+        "Recent block invalid because it doesn't connect to existing chain: Expected selected parent sequencing commitment: {0}. Actual: {1}"
     )]
     RecentBlockDoesntConnect(Expected<Hash>, Actual<Hash>),
-    #[error("Historical block invalid because it doesn't connect to existing chain: Expected sequencing commitment: {0}. Actual: {1}"
-    )]
+    #[error("Historical block invalid because it doesn't connect to existing chain: Expected sequencing commitment: {0}. Actual: {1}")]
     HistoricalBlockDoesntConnect(Expected<Hash>, Actual<Hash>),
 }
 

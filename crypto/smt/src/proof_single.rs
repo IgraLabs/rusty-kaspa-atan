@@ -33,22 +33,21 @@
 
 use crate::store::{BranchKey, CollapsedLeaf, Node, SmtStore};
 use alloc::vec::Vec;
-use thiserror::Error;
 use kaspa_hashes::{Hash, ZERO_HASH};
+use thiserror::Error;
 /// Cache of already-computed branch hashes, keyed by `(depth, key_prefix)`.
 ///
 /// Used by [`SmtProof::verify_cached`] to skip redundant `hash_node` calls when
 /// verifying multiple proofs against the same tree root. Upper branches are
 /// shared across proofs, so this can significantly reduce hashing work.
 pub type ProofBranchCache = alloc::collections::BTreeMap<BranchKey, Hash>;
-use crate::tree::{child_branch_key, SparseMerkleTree};
-use crate::{bit_at, hash_node, SmtHasher, DEPTH};
+use crate::tree::{SparseMerkleTree, child_branch_key};
+use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum SmtProofError {
     // TODO: Add Expected/Actual types here too.
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
-    )]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
     SiblingCountMismatch { expected: usize, actual: usize },
 }
 
@@ -403,7 +402,6 @@ pub(crate) enum NodeBranchingData {
     Terminal(ProofTerminal),
     EmptySubtree,
 }
-
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     /// Retrieves the branching data regarding `branch_key` from the storage

@@ -67,7 +67,7 @@ pub struct ImportLane {
     pub proof: Option<kaspa_smt::proof_single::OwnedSmtProof>,
 }
 
-pub type ImportLaneBatchIterator<'a> = &'a mut (dyn Iterator<Item=Vec<ImportLane>> + Send);
+pub type ImportLaneBatchIterator<'a> = &'a mut (dyn Iterator<Item = Vec<ImportLane>> + Send);
 
 /// SMT metadata for IBD sync, verified against the pruning point header.
 ///
@@ -342,7 +342,7 @@ pub trait ConsensusApi: Send + Sync {
     fn open_pruning_point_smt_lane_stream(
         &self,
         _expected_pruning_point: Hash,
-    ) -> ConsensusResult<Box<dyn Iterator<Item=ConsensusResult<ImportLane>> + Send + 'static>> {
+    ) -> ConsensusResult<Box<dyn Iterator<Item = ConsensusResult<ImportLane>> + Send + 'static>> {
         unimplemented!()
     }
 

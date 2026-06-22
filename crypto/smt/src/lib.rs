@@ -27,8 +27,8 @@ extern crate core;
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod proof_single;
 pub mod proof_multi;
+pub mod proof_single;
 pub mod store;
 pub mod streaming;
 pub mod tree;

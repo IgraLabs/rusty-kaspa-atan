@@ -2,15 +2,15 @@
 
 use std::collections::HashMap;
 
-use kaspa_database::prelude::{BatchDbWriter, StoreError, StoreResult, DB};
+use kaspa_database::prelude::{BatchDbWriter, DB, StoreError, StoreResult};
 use kaspa_hashes::{Hash, SeqCommitActiveNode};
 use kaspa_smt::store::{BranchKey, CollapsedLeaf, Node};
 use kaspa_smt::streaming::{ChildInfo, MergeSink};
-use kaspa_smt::{bit_at, hash_node, SmtHasher};
+use kaspa_smt::{SmtHasher, bit_at, hash_node};
 use rocksdb::WriteBatch;
 
-use crate::processor::SmtStores;
 use crate::BlockHash;
+use crate::processor::SmtStores;
 
 pub(crate) struct DbSink<'a> {
     db: &'a DB,
@@ -96,7 +96,7 @@ impl<'a> DbSink<'a> {
     /// `streaming_import` after a pending score-index entry has been flushed,
     /// so the map's footprint stays bounded by unflushed lanes rather than
     /// the full import.
-    pub(crate) fn forget_lanes<I: IntoIterator<Item=Hash>>(&mut self, lane_keys: I) {
+    pub(crate) fn forget_lanes<I: IntoIterator<Item = Hash>>(&mut self, lane_keys: I) {
         for lk in lane_keys {
             self.lane_seal_depth.remove(&lk);
         }
