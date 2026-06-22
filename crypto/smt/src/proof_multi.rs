@@ -237,7 +237,13 @@ impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
 
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
-    fn add_next_sibling_to_proof(
+    /// For a set of given `keys` that are on the same branch at `depth`, this generates the next
+    /// proof step, be it a terminal or sibling.
+    ///
+    /// # Returns
+    /// * `true` if the added step was a terminal
+    /// * `false` if the added step was a sibling
+    fn add_next_step_to_proof(
         &self,
         bitmap: &mut MutableBitmap,
         total_sibling_count: &mut usize,
@@ -245,7 +251,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         terminals: &mut HashMap<Hash, ProofTerminal>,
         keys: &[Hash],
         depth: usize,
-    ) -> Result<(), ProveError<S>> {
+    ) -> Result<bool, ProveError<S>> {
+        let is_terminal: bool;
         match self.get_branching_data(&keys[0], depth).map_err(ProveError::StoreError)? {
             NodeBranchingData::Sibling(sibling) => {
                 *total_sibling_count += 1;
@@ -256,18 +263,21 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                         siblings.push(sibling_hash);
                     }
                 }
+                is_terminal = false;
             }
             NodeBranchingData::Terminal(proof_terminal) => {
+                for i in 0..DEPTH {}
                 if keys.len() != 1 {
                     return Err(ProveError::TerminalForMultipleKeys(keys.to_vec()));
                 }
                 terminals.insert(keys[0], proof_terminal);
+                is_terminal = true;
             }
             NodeBranchingData::EmptySubtree => {
                 return Err(ProveError::EmptySubtreeKey(keys[0]));
             }
         };
-        Ok(())
+        Ok(is_terminal)
     }
 
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
@@ -292,11 +302,15 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
             let (left, right) = current.keys.split_at(split);
             // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
             if left.is_empty() {
-                self.add_next_sibling_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, right, current.depth as usize)?;
-                queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
+                let is_terminal = self.add_next_step_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, right, current.depth as usize)?;
+                if !is_terminal {
+                    queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
+                }
             } else if right.is_empty() {
-                self.add_next_sibling_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, left, current.depth as usize)?;
-                queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
+                let is_terminal = self.add_next_step_to_proof(&mut bitmap, &mut total_sibling_count, &mut siblings, &mut terminals, left, current.depth as usize)?;
+                if !is_terminal {
+                    queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
+                }
             } else {
                 queue.push_back(QueueItem { keys: left, depth: current.depth + 1 });
                 queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
