@@ -96,21 +96,7 @@ pub enum SmtMultiProofError {
 }
 
 impl<'a> SmtMultiProof<'a> {
-    /// Reconstruct the Merkle root from a proof, optionally using a branch cache.
-    ///
-    /// # Terminal-dependent initial state
-    ///
-    /// The starting hash (`current`) depends on [`ProofTerminal`]:
-    ///
-    /// | Terminal | `leaf_hash` | Initial `current` |
-    /// |---|---|---|
-    /// | `CollapsedOther` | `None`, different key | `hash(collapsed, foreign_key, foreign_leaf)` — non-inclusion witness |
-    /// | `CollapsedOther` | `None`, same key | `ZERO_HASH` — proves non-membership inside that subtree |
-    /// | any | `Some(lh)` | `hash(collapsed, queried_key, lh)` — inclusion proof |
-    /// | any | `None` | `ZERO_HASH` — non-inclusion (empty subtree) |
-    ///
-    /// After seeding `current`, the function hashes upward from `terminal.depth() - 1`
-    /// to the root (depth 0), consuming siblings in reverse bitmap order.
+    /// TODO: Comment
     pub fn compute_root<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash]) -> Result<Hash, SmtMultiProofError> {
         // 1. Validate the counts of keys, leaf_hashes and terminals match
         if self.terminals.len() != keys.len() {
@@ -178,7 +164,7 @@ impl<'a> SmtMultiProof<'a> {
 
     /// Verify that the proof is consistent with the given `expected_root`.
     ///
-    /// Equivalent to `self.compute_root(key, leaf_hash)? == expected_root`.
+    /// Equivalent to `self.compute_root(keys, leaf_hashes)? == expected_root`.
     pub fn verify<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], expected_root: Hash) -> Result<bool, SmtMultiProofError> {
         Ok(self.compute_root::<H>(keys, leaf_hashes)? == expected_root)
     }
@@ -216,6 +202,8 @@ pub enum ProveError<S: SmtStore> {
     StoreError(S::Error),
     #[error("Reached a terminal while split is still multiple keys: {0:?}")]
     TerminalForMultipleKeys(Vec<Hash>),
+    #[error("Got CollapsedOther while generating a multi-proof. This should never happen")]
+    CollapsedOtherInMultiProof(ProofTerminal),
     #[error("Empty subtree for key: {0}")]
     EmptySubtreeKey(Hash),
     #[error("Keys are not sorted")]
@@ -231,55 +219,14 @@ impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
             Self::TerminalForMultipleKeys(keys) => f.debug_tuple("TerminalForMultipleKeys").field(keys).finish(),
             Self::EmptySubtreeKey(key) => f.debug_tuple("EmptySubtreeKey").field(key).finish(),
             Self::KeysNotSorted => f.debug_tuple("KeysNotSorted").finish(),
+            Self::CollapsedOtherInMultiProof(proof_terminal) => f.debug_tuple("CollapsedOtherInMultiProof").field(proof_terminal).finish(),
         }
     }
 }
 
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
-    /// For a set of given `keys` that are on the same branch at `depth`, this generates the next
-    /// proof step, be it a terminal or sibling.
-    ///
-    /// # Returns
-    /// * `true` if the added step was a terminal
-    /// * `false` if the added step was a sibling
-    fn add_next_step_to_proof(
-        &self,
-        bitmap: &mut MutableBitmap,
-        total_sibling_count: &mut usize,
-        siblings: &mut Vec<Hash>,
-        terminals: &mut HashMap<Hash, ProofTerminal>,
-        keys: &[Hash],
-        depth: usize,
-    ) -> Result<bool, ProveError<S>> {
-        let is_terminal: bool;
-        match self.get_branching_data(&keys[0], depth).map_err(ProveError::StoreError)? {
-            NodeBranchingData::Sibling(sibling) => {
-                *total_sibling_count += 1;
-                match sibling {
-                    None => bitmap.append(false),
-                    Some(sibling_hash) => {
-                        bitmap.append(true);
-                        siblings.push(sibling_hash);
-                    }
-                }
-                is_terminal = false;
-            }
-            NodeBranchingData::Terminal(proof_terminal) => {
-                for i in 0..DEPTH {}
-                if keys.len() != 1 {
-                    return Err(ProveError::TerminalForMultipleKeys(keys.to_vec()));
-                }
-                terminals.insert(keys[0], proof_terminal);
-                is_terminal = true;
-            }
-            NodeBranchingData::EmptySubtree => {
-                return Err(ProveError::EmptySubtreeKey(keys[0]));
-            }
-        };
-        Ok(is_terminal)
-    }
-
+    /// TODO: comment
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
         if !keys.is_sorted() {
             return Err(ProveError::KeysNotSorted);
@@ -319,6 +266,52 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
         let terminals = keys.iter().map(|key| terminals.remove(key).unwrap_or(ProofTerminal::Full)).collect();
         Ok(OwnedSmtMultiProof { bitmap: bitmap.bitmap(), total_sibling_count, siblings, terminals })
+    }
+    /// For a set of given `keys` that are on the same branch at `depth`, this generates the next
+    /// proof step, be it a terminal or sibling, and updates the bitmap, siblings and terminals.
+    ///
+    /// # Returns
+    /// * `true` if the added step was a terminal
+    /// * `false` if the added step was a sibling
+    fn add_next_step_to_proof(
+        &self,
+        bitmap: &mut MutableBitmap,
+        total_sibling_count: &mut usize,
+        siblings: &mut Vec<Hash>,
+        terminals: &mut HashMap<Hash, ProofTerminal>,
+        keys: &[Hash],
+        depth: usize,
+    ) -> Result<bool, ProveError<S>> {
+        let is_terminal: bool;
+        match self.get_branching_data(&keys[0], depth).map_err(ProveError::StoreError)? {
+            NodeBranchingData::Sibling(sibling) => {
+                *total_sibling_count += 1;
+                match sibling {
+                    None => {
+                        bitmap.append(true);
+                    }
+                    Some(sibling_hash) => {
+                        bitmap.append(false);
+                        siblings.push(sibling_hash);
+                    }
+                }
+                is_terminal = false;
+            }
+            NodeBranchingData::Terminal(proof_terminal) => {
+                if keys.len() != 1 {
+                    return Err(ProveError::TerminalForMultipleKeys(keys.to_vec()));
+                }
+                if let ProofTerminal::CollapsedOther { .. } = proof_terminal {
+                    return Err(ProveError::CollapsedOtherInMultiProof(proof_terminal));
+                }
+                terminals.insert(keys[0], proof_terminal);
+                is_terminal = true;
+            }
+            NodeBranchingData::EmptySubtree => {
+                return Err(ProveError::EmptySubtreeKey(keys[0]));
+            }
+        };
+        Ok(is_terminal)
     }
 }
 

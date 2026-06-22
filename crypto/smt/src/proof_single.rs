@@ -397,6 +397,7 @@ impl OwnedSmtProof {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum NodeBranchingData {
     Sibling(Option<Hash>), // Will be None if
     Terminal(ProofTerminal),
@@ -441,7 +442,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                 }
             }
             Some(Node::Collapsed(cl)) => {
-                if cl.lane_key == branch_key.node_key {
+                if cl.lane_key == *key {
                     Ok(NodeBranchingData::Terminal(ProofTerminal::Collapsed { depth: depth as u8 }))
                 } else {
                     Ok(NodeBranchingData::Terminal(ProofTerminal::CollapsedOther { depth: depth as u8, leaf: cl }))
