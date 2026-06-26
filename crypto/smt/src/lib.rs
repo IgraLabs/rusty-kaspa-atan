@@ -33,6 +33,7 @@ pub mod store;
 pub mod streaming;
 pub mod tree;
 
+use std::println;
 use kaspa_hashes::{Hash, Hasher};
 
 /// Depth of the sparse Merkle tree (number of levels from root to leaf).
@@ -46,7 +47,9 @@ pub const DEPTH: usize = 256;
 pub fn hash_node<H: Hasher>(left: Hash, right: Hash) -> Hash {
     let mut hasher = H::default();
     hasher.update(left).update(right);
-    hasher.finalize()
+    let result = hasher.finalize(); // TODO: return directly
+    println!("H({left}, {right}) = {result})");
+    result
 }
 
 /// Extract bit `d` of a key using big-endian bit ordering.

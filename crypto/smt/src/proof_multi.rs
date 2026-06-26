@@ -1,11 +1,12 @@
 use crate::proof_single::{NodeBranchingData, ProofTerminal};
-use crate::store::SmtStore;
+use crate::store::{BranchKey, SmtStore};
 use crate::tree::SparseMerkleTree;
-use crate::{DEPTH, SmtHasher, are_siblings, bit_at, hash_node};
+use crate::{are_siblings, bit_at, hash_node, SmtHasher, DEPTH};
 use kaspa_hashes::Hash;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::prelude::rust_2015::Vec;
+use std::println;
 use thiserror::Error;
 
 /// Borrowed, zero-copy compressed multi-lane proof for a 256-bit Sparse Merkle Tree.
@@ -80,13 +81,15 @@ impl PartialOrd for QueueItem {
 
 #[derive(Error, Debug, Clone)]
 pub enum SmtMultiProofError {
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
+    )]
     SiblingCountMismatch { expected: usize, actual: usize },
     #[error("key count mismatch: expected {expected} keys, but got {actual}")]
     KeyCountMismatch { expected: usize, actual: usize },
     #[error("leaf hashes count mismatch: expected {expected} leaf hashes, but got {actual}")]
     LeafHashesCountMismatch { expected: usize, actual: usize },
-    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof")]
+    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof"
+    )]
     CollapsedOtherInMultiProof,
     #[error("There were more siblings provided then required to calculate root")]
     MoreSiblingsThenNeeded,
@@ -94,7 +97,10 @@ pub enum SmtMultiProofError {
 
 impl<'a> SmtMultiProof<'a> {
     /// TODO: Comment
-    pub fn compute_root<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash]) -> Result<Hash, SmtMultiProofError> {
+    /// TODO: Remove tree parameter
+    pub fn compute_root<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], tree: &SparseMerkleTree<H>) -> Result<Hash, SmtMultiProofError> {
+        println!("=========== compute_root ========");
+        println!("Proof: {:?}", self);
         // 1. Validate the counts of keys, leaf_hashes and terminals match
         if self.terminals.len() != keys.len() {
             return Err(SmtMultiProofError::KeyCountMismatch { expected: self.terminals.len(), actual: keys.len() });
@@ -122,41 +128,61 @@ impl<'a> SmtMultiProof<'a> {
             match terminal {
                 // CollapsedOther is impossible in multi-proofs that don't support exclusion.
                 ProofTerminal::CollapsedOther { .. } => return Err(SmtMultiProofError::CollapsedOtherInMultiProof),
-                ProofTerminal::Full => queue.push(QueueItem { key: keys[i], depth: DEPTH, key_index: i, value: leaf_hashes[i] }),
+                ProofTerminal::Full => queue.push(QueueItem { key: keys[i], depth: DEPTH, key_index: i, value: hash_node::<H::CollapsedHasher>(keys[i], leaf_hashes[i]) }),
                 ProofTerminal::Collapsed { depth } => {
-                    queue.push(QueueItem { key: keys[i], depth: *depth as usize, key_index: i, value: leaf_hashes[i] })
+                    queue.push(QueueItem { key: keys[i], depth: *depth as usize, key_index: i, value: hash_node::<H::CollapsedHasher>(keys[i], leaf_hashes[i]) })
                 }
             };
         }
 
         // 5. Iterate bottom-to-top combining branches using sibling sourced from either:
-        let mut bitmap_index = 0;
-        let mut siblings_iter = self.siblings.iter();
+        let mut bitmap_index = self.total_sibling_count;
+        let mut siblings_iter = self.siblings.iter().rev();
+        println!("total sibling count: {}", self.total_sibling_count);
 
         while !queue.is_empty() {
             let current = queue.pop().unwrap();
+            println!("current: {:?}", current);
+            let branch_key = BranchKey::new(current.depth as u8, &current.key);
+            println!("branch key: {:?}", branch_key);
+            println!("From tree: {:?}:", tree.store.get_node(&branch_key).expect("Failed to get node"));
+
             let is_left = !bit_at(&current.key, current.depth);
+            println!("is_left: {:?}", is_left);
             // If this is a left branching node, the sibling branch might be inside the proof as well.
             // In such a case - it will be the next item in the queue.
-            let is_sibling_in_queue = is_left
-                && queue
-                    .peek()
-                    .is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
+            let is_sibling_in_queue = is_left && queue.peek().is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
+            println!("is_sibling_in_queue: {:?}", is_sibling_in_queue);
             let sibling = if is_sibling_in_queue {
                 queue.pop().unwrap().value
             } else {
-                if bitmap_index == self.bitmap.len() * 8 {
+                println!("bitmap_index: {}", bitmap_index);
+                if bitmap_index == 0 {
+                    println!("bitmap index is 0 - returning {:?}", current);
                     return Ok(current.value);
                 }
-                let is_sibling_zero = self.bitmap_value_at_index(bitmap_index);
-                bitmap_index += 1;
-                if is_sibling_zero { H::empty_hash_at_depth(current.depth) } else { *(siblings_iter.next().unwrap()) }
+                bitmap_index -= 1;
+                let is_sibling_empty = !self.bitmap_value_at_index(bitmap_index);
+                println!("is_sibling_zero: {:?}", is_sibling_empty);
+                if is_sibling_empty {
+                    println!("using sibling iter");
+                    *(siblings_iter.next().unwrap())
+                } else {
+                    println!("using zero hash");
+                    H::empty_hash_at_depth(current.depth - 1) // TODO: Understand why - 1
+                }
             };
+            println!("current: {:?}", current.value);
+            println!("sibling: {:?}", sibling);
+            tree.store.get_node(&BranchKey::new(current.depth as u8, &current.key)).expect("Failed to get node");
+            let (left, right) = if bit_at(&current.key, current.depth - 1) { (sibling, current.value) } else { (current.value, sibling) };
+            let value = hash_node::<H>(left, right);
+            println!("next value: {:?}", value);
             queue.push(QueueItem {
                 key: current.key,
                 depth: current.depth - 1,
                 key_index: current.key_index,
-                value: hash_node::<H>(current.value, sibling),
+                value,
             })
         }
         Err(SmtMultiProofError::MoreSiblingsThenNeeded)
@@ -165,8 +191,12 @@ impl<'a> SmtMultiProof<'a> {
     /// Verify that the proof is consistent with the given `expected_root`.
     ///
     /// Equivalent to `self.compute_root(keys, leaf_hashes)? == expected_root`.
-    pub fn verify<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], expected_root: Hash) -> Result<bool, SmtMultiProofError> {
-        Ok(self.compute_root::<H>(keys, leaf_hashes)? == expected_root)
+    /// TODO: Remove tree parameter
+    pub fn verify<H: SmtHasher>(&self, keys: &[Hash], leaf_hashes: &[Hash], expected_root: Hash, tree: &SparseMerkleTree<H>) -> Result<bool, SmtMultiProofError> {
+        let computed_root = self.compute_root::<H>(keys, leaf_hashes, tree)?;
+        println!("Computed root = {:?}", computed_root);
+        println!("Expected root = {:?}", expected_root);
+        Ok(computed_root == expected_root)
     }
 
     fn bitmap_value_at_index(&self, index: usize) -> bool {
@@ -229,6 +259,7 @@ impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     /// TODO: comment
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
+        println!("=========== prove_multiple ========");
         if !keys.is_sorted() {
             return Err(ProveError::KeysNotSorted);
         }
@@ -237,6 +268,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         let mut siblings = Vec::new();
         let mut terminals = HashMap::new();
 
+        #[derive(Debug)]
         struct QueueItem<'a> {
             keys: &'a [Hash],
             depth: u8,
@@ -248,6 +280,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
             let split = current.keys.partition_point(|key| !bit_at(key, current.depth as usize));
             let (left, right) = current.keys.split_at(split);
+            println!("~~~~~~~");
+            println!("Current: {:?}", current);
             // unwraps are safe: since current.keys is not empty, if left is empty - right is not, and vice versa.
             if left.is_empty() {
                 let is_terminal = self.add_next_step_to_proof(
@@ -301,6 +335,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         match self.get_branching_data(&keys[0], depth).map_err(ProveError::StoreError)? {
             NodeBranchingData::Sibling(sibling) => {
                 *total_sibling_count += 1;
+                println!("Sibling: {:?}", sibling.unwrap_or(H::empty_hash_at_depth(depth)));
                 match sibling {
                     None => {
                         bitmap.append(true);
@@ -313,6 +348,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                 is_terminal = false;
             }
             NodeBranchingData::Terminal(proof_terminal) => {
+                println!("Terminal: {:?}", proof_terminal);
                 if keys.len() != 1 {
                     return Err(ProveError::TerminalForMultipleKeys(keys.to_vec()));
                 }
@@ -332,8 +368,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tree::tests::{Smt, TestHasher, test_key, test_leaf};
-    use std::vec;
+    use crate::tree::tests::{test_key, test_leaf, Smt, TestHasher};
+    use std::{println, vec};
     use zerocopy::IntoBytes;
 
     #[test]
@@ -341,18 +377,20 @@ mod tests {
         let mut tree = Smt::new();
         let mut proof_keys = vec![];
         let mut proof_leaf_hashes = vec![];
-        for i in 0..1000u32 {
+        for i in 0..9u32 {
+            println!("~~~~~ i={i}");
             let key = test_key(i.as_bytes());
             let value = test_leaf(i.as_bytes());
             tree.insert(key, value);
 
-            if i.is_multiple_of(3) {
+            if i.is_multiple_of(5) {
+                println!("adding key: {:?}, value: {:?}", key, value);
                 proof_keys.push(key);
                 proof_leaf_hashes.push(value);
             }
         }
         proof_keys.sort();
         let proof = tree.prove_multiple(&proof_keys).unwrap();
-        assert!(proof.as_proof().verify::<TestHasher>(&proof_keys, &proof_leaf_hashes, tree.root()).unwrap(), "multi_proof failed");
+        assert!(proof.as_proof().verify::<TestHasher>(&proof_keys, &proof_leaf_hashes, tree.root(), &tree).unwrap(), "multi_proof failed");
     }
 }

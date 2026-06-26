@@ -16,6 +16,7 @@ use alloc::vec::Vec;
 use crate::store::{BTreeSmtStore, BranchKey, CollapsedLeaf, LeafUpdate, Node, SmtStore, SortedLeafUpdates, SortedLeafUpdatesRef};
 use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 use core::marker::PhantomData;
+use std::println;
 use kaspa_hashes::Hash;
 
 /// A 256-bit Sparse Merkle Tree with incremental updates and cached root.
@@ -93,6 +94,7 @@ impl<H: SmtHasher> SparseMerkleTree<H, BTreeSmtStore> {
         let sorted = SortedLeafUpdates::from_unsorted(core::iter::once(LeafUpdate { key, leaf_hash }));
         let (new_root, changes) = compute_root_update::<H, _>(&self.store, self.root, sorted).unwrap();
         for (bk, node) in &changes {
+            println!("New change: bk: {:?}, node: {:?}", bk, node);
             self.store.insert_node(*bk, *node);
         }
         self.root = new_root;
@@ -278,8 +280,7 @@ fn compute_subtree<H: SmtHasher, S: SmtStore>(
 
     let existing = read_node::<S>(store, changes, &subtree_key)?;
 
-    if let Some(u) = updates.single()
-        && existing.is_none()
+    if let Some(u) = updates.single() && existing.is_none()
     {
         if u.leaf_hash == kaspa_hashes::ZERO_HASH {
             return Ok(NodeResult::Empty);
@@ -289,9 +290,7 @@ fn compute_subtree<H: SmtHasher, S: SmtStore>(
         return Ok(NodeResult::Collapsed(cl));
     }
 
-    if let Some(u) = updates.single()
-        && let Some(Node::Collapsed(existing_cl)) = existing
-        && u.key == existing_cl.lane_key
+    if let Some(u) = updates.single() && let Some(Node::Collapsed(existing_cl)) = existing && u.key == existing_cl.lane_key
     {
         let new_node = if u.leaf_hash == kaspa_hashes::ZERO_HASH {
             None
@@ -352,8 +351,7 @@ fn compute_subtree<H: SmtHasher, S: SmtStore>(
     //
     // Force-emit a `None` at the originating child so any future descent
     // through here sees an empty subtree below the new parent Collapsed.
-    if depth < DEPTH - 1
-        && let NodeResult::Collapsed(cl) = result
+    if depth < DEPTH - 1 && let NodeResult::Collapsed(cl) = result
     {
         let goes_right = bit_at(&cl.lane_key, depth);
         let child_key = child_branch_key(&subtree_key, goes_right);
@@ -399,7 +397,7 @@ pub(crate) mod tests {
 
     // ---- Helpers ----
 
-    fn updates(entries: impl IntoIterator<Item = (Hash, Hash)>) -> SortedLeafUpdates {
+    fn updates(entries: impl IntoIterator<Item=(Hash, Hash)>) -> SortedLeafUpdates {
         SortedLeafUpdates::from_unsorted(entries.into_iter().map(|(key, leaf_hash)| LeafUpdate { key, leaf_hash }))
     }
 
@@ -421,7 +419,8 @@ pub(crate) mod tests {
         Hash::from_bytes(bytes)
     }
 
-    fn assert_inclusion(tree: &Smt, key: &Hash, leaf: Hash) {
+    //TODO: Remove pub(crate)
+    pub(crate) fn assert_inclusion(tree: &Smt, key: &Hash, leaf: Hash) {
         let root = tree.root();
         let proof = tree.prove(key).unwrap();
         assert!(proof.verify::<TestHasher>(key, Some(leaf), root).unwrap(), "inclusion proof failed for key {key}");
@@ -1472,8 +1471,7 @@ pub(crate) mod tests {
         let l2 = test_leaf(b"b");
 
         let store = BTreeSmtStore::new();
-        let (root, changes) =
-            compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
+        let (root, changes) = compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
 
         assert_ne!(root, TestHasher::empty_root());
 
@@ -1514,8 +1512,7 @@ pub(crate) mod tests {
 
         // Insert two leaves
         let store = BTreeSmtStore::new();
-        let (root1, changes1) =
-            compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
+        let (root1, changes1) = compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
 
         // Apply to store
         let mut store2 = BTreeSmtStore::new();
@@ -1562,8 +1559,7 @@ pub(crate) mod tests {
 
         // Root should match inserting both from scratch
         let store3 = BTreeSmtStore::new();
-        let (root_both, _) =
-            compute_root_update::<TestHasher, _>(&store3, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
+        let (root_both, _) = compute_root_update::<TestHasher, _>(&store3, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
         assert_eq!(root2, root_both, "incremental expand should match batch insert");
     }
 
@@ -1608,8 +1604,7 @@ pub(crate) mod tests {
 
         // Insert k1, k2
         let store = BTreeSmtStore::new();
-        let (root1, changes1) =
-            compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
+        let (root1, changes1) = compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
 
         let mut store2 = BTreeSmtStore::new();
         for (bk, nk) in &changes1 {
@@ -1621,8 +1616,7 @@ pub(crate) mod tests {
 
         // Should match inserting k2, k3 from scratch
         let store3 = BTreeSmtStore::new();
-        let (root_expected, _) =
-            compute_root_update::<TestHasher, _>(&store3, TestHasher::empty_root(), updates([(k2, l2), (k3, l3)])).unwrap();
+        let (root_expected, _) = compute_root_update::<TestHasher, _>(&store3, TestHasher::empty_root(), updates([(k2, l2), (k3, l3)])).unwrap();
         assert_eq!(root2, root_expected);
     }
 
@@ -1640,8 +1634,7 @@ pub(crate) mod tests {
         let l2 = test_leaf(b"deep2");
 
         let store = BTreeSmtStore::new();
-        let (root, changes) =
-            compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
+        let (root, changes) = compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2)])).unwrap();
 
         // The two keys diverge very late (near leaf level), so we should have
         // internal nodes from the divergence point to the root, but collapsed below
@@ -1660,8 +1653,7 @@ pub(crate) mod tests {
         let l3 = test_leaf(b"v3");
 
         let store = BTreeSmtStore::new();
-        let (root1, changes1) =
-            compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2), (k3, l3)])).unwrap();
+        let (root1, changes1) = compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates([(k1, l1), (k2, l2), (k3, l3)])).unwrap();
 
         let mut store2 = BTreeSmtStore::new();
         for (bk, nk) in &changes1 {
@@ -1697,8 +1689,7 @@ pub(crate) mod tests {
         // Insert all at once (batch)
         let all_updates: Vec<(Hash, Hash)> = keys.iter().copied().zip(leaves.iter().copied()).collect();
         let store = BTreeSmtStore::new();
-        let (root_batch, _) =
-            compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates(all_updates.clone())).unwrap();
+        let (root_batch, _) = compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates(all_updates.clone())).unwrap();
 
         // Insert one by one (incremental)
         let mut store_incr = BTreeSmtStore::new();
@@ -1717,8 +1708,7 @@ pub(crate) mod tests {
         let to_expire: Vec<(Hash, Hash)> = keys[..n / 2].iter().map(|k| (*k, ZERO_HASH)).collect();
         let remaining: Vec<(Hash, Hash)> = keys[n / 2..].iter().copied().zip(leaves[n / 2..].iter().copied()).collect();
 
-        let (root_after_expire, changes_expire) =
-            compute_root_update::<TestHasher, _>(&store_incr, root_incr, updates(to_expire)).unwrap();
+        let (root_after_expire, changes_expire) = compute_root_update::<TestHasher, _>(&store_incr, root_incr, updates(to_expire)).unwrap();
 
         // Apply expire changes
         let mut store_remaining = store_incr;
@@ -1728,8 +1718,7 @@ pub(crate) mod tests {
 
         // Insert remaining from scratch
         let store_fresh = BTreeSmtStore::new();
-        let (root_fresh, _) =
-            compute_root_update::<TestHasher, _>(&store_fresh, TestHasher::empty_root(), updates(remaining)).unwrap();
+        let (root_fresh, _) = compute_root_update::<TestHasher, _>(&store_fresh, TestHasher::empty_root(), updates(remaining)).unwrap();
 
         assert_eq!(root_after_expire, root_fresh, "expire half should match inserting only the remaining half");
     }
@@ -1787,8 +1776,7 @@ pub(crate) mod tests {
         }
 
         let store = BTreeSmtStore::new();
-        let (slo_root, _) =
-            compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates(keys_and_leaves.clone())).unwrap();
+        let (slo_root, _) = compute_root_update::<TestHasher, _>(&store, TestHasher::empty_root(), updates(keys_and_leaves.clone())).unwrap();
 
         assert_eq!(tree.root(), slo_root, "walk_up and batch SLO must agree");
     }
@@ -1845,15 +1833,13 @@ pub(crate) mod tests {
     fn walk_up_vs_slo_random() {
         let mut rng = StdRng::seed_from_u64(0xdead_beef);
         for n in [1, 2, 3, 5, 10, 20, 50] {
-            let kv: Vec<(Hash, Hash)> = (0..n)
-                .map(|_| {
-                    let mut kb = [0u8; 32];
-                    let mut vb = [0u8; 32];
-                    rng.fill(&mut kb);
-                    rng.fill(&mut vb);
-                    (Hash::from_bytes(kb), Hash::from_bytes(vb))
-                })
-                .collect();
+            let kv: Vec<(Hash, Hash)> = (0..n).map(|_| {
+                let mut kb = [0u8; 32];
+                let mut vb = [0u8; 32];
+                rng.fill(&mut kb);
+                rng.fill(&mut vb);
+                (Hash::from_bytes(kb), Hash::from_bytes(vb))
+            }).collect();
 
             let mut tree = Smt::new();
             for &(k, l) in &kv {
