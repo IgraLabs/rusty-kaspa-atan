@@ -81,13 +81,15 @@ impl PartialOrd for QueueItem {
 
 #[derive(Error, Debug, Clone)]
 pub enum SmtMultiProofError {
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
+    )]
     SiblingCountMismatch { expected: usize, actual: usize },
-    #[error("key count mismatch: expected {expected} keys, but got {actual}")]
-    KeyCountMismatch { expected: usize, actual: usize },
-    #[error("leaf hashes count mismatch: expected {expected} leaf hashes, but got {actual}")]
-    LeafHashesCountMismatch { expected: usize, actual: usize },
-    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof")]
+    #[error("key with leaf hashes count mismatch: expected {expected} keys, but got {actual}")]
+    KeyWithLeafHashesCountMismatch { expected: usize, actual: usize },
+    #[error("key with leaf hashes are not sorted")]
+    KeyWithLeafHashesAreNotSorted,
+    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof"
+    )]
     CollapsedOtherInMultiProof,
     #[error("There were more siblings provided then required to calculate root")]
     MoreSiblingsThenNeeded,
@@ -98,20 +100,21 @@ impl<'a> SmtMultiProof<'a> {
     /// TODO: Remove tree parameter
     pub fn compute_root<H: SmtHasher>(
         &self,
-        keys: &[Hash],
-        leaf_hashes: &[Hash],
+        keys_with_leaf_hashes: &[(Hash, Hash)],
         tree: &SparseMerkleTree<H>,
     ) -> Result<Hash, SmtMultiProofError> {
         println!("=========== compute_root ========");
         println!("Proof: {:?}", self);
-        // 1. Validate the counts of keys, leaf_hashes and terminals match
-        if self.terminals.len() != keys.len() {
-            return Err(SmtMultiProofError::KeyCountMismatch { expected: self.terminals.len(), actual: keys.len() });
+        println!("keys with leaf hashes: {:?}", keys_with_leaf_hashes);
+        // 1. Validate the counts of keys_with_leaf_hashes and terminals match
+        if self.terminals.len() != keys_with_leaf_hashes.len() {
+            return Err(SmtMultiProofError::KeyWithLeafHashesCountMismatch { expected: self.terminals.len(), actual: keys_with_leaf_hashes.len() });
         }
-        if self.terminals.len() != leaf_hashes.len() {
-            return Err(SmtMultiProofError::LeafHashesCountMismatch { expected: self.terminals.len(), actual: leaf_hashes.len() });
+        // 2. Validate keys are sorted
+        if !keys_with_leaf_hashes.iter().map(|(key, _)| key).is_sorted() {
+            return Err(SmtMultiProofError::KeyWithLeafHashesAreNotSorted);
         }
-        // 2. Validate sibling count
+        // 3. Validate sibling count
         let zero_bits: usize = self.bitmap.iter().map(|byte| byte.count_zeros() as usize).sum();
         let trailing_bits = 8 - (self.total_sibling_count % 8);
         let expected_sibling_count = zero_bits - trailing_bits;
@@ -119,7 +122,7 @@ impl<'a> SmtMultiProof<'a> {
             return Err(SmtMultiProofError::SiblingCountMismatch { expected: expected_sibling_count, actual: self.siblings.len() });
         }
 
-        // 3. Create bottom-to-top priority queue with Ordering:
+        // 4. Create bottom-to-top priority queue with Ordering:
         //      a. Depth
         //      b. Key sequence
         // The key sequence sub-ordering ensures stability, so that multiple keys with the same
@@ -131,18 +134,24 @@ impl<'a> SmtMultiProof<'a> {
             match terminal {
                 // CollapsedOther is impossible in multi-proofs that don't support exclusion.
                 ProofTerminal::CollapsedOther { .. } => return Err(SmtMultiProofError::CollapsedOtherInMultiProof),
-                ProofTerminal::Full => queue.push(QueueItem {
-                    key: keys[i],
-                    depth: DEPTH,
-                    key_index: i,
-                    value: hash_node::<H::CollapsedHasher>(keys[i], leaf_hashes[i]),
-                }),
-                ProofTerminal::Collapsed { depth } => queue.push(QueueItem {
-                    key: keys[i],
-                    depth: *depth as usize,
-                    key_index: i,
-                    value: hash_node::<H::CollapsedHasher>(keys[i], leaf_hashes[i]),
-                }),
+                ProofTerminal::Full => {
+                    let (key, leaf_hash) = keys_with_leaf_hashes[i];
+                    queue.push(QueueItem {
+                        key,
+                        depth: DEPTH,
+                        key_index: i,
+                        value: hash_node::<H::CollapsedHasher>(key, leaf_hash),
+                    });
+                }
+                ProofTerminal::Collapsed { depth } => {
+                    let (key, leaf_hash) = keys_with_leaf_hashes[i];
+                    queue.push(QueueItem {
+                        key,
+                        depth: *depth as usize,
+                        key_index: i,
+                        value: hash_node::<H::CollapsedHasher>(key, leaf_hash),
+                    })
+                }
             };
         }
 
@@ -162,10 +171,7 @@ impl<'a> SmtMultiProof<'a> {
             println!("is_left: {:?}", is_left);
             // If this is a left branching node, the sibling branch might be inside the proof as well.
             // In such a case - it will be the next item in the queue.
-            let is_sibling_in_queue = is_left
-                && queue
-                    .peek()
-                    .is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
+            let is_sibling_in_queue = is_left && queue.peek().is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
             println!("is_sibling_in_queue: {:?}", is_sibling_in_queue);
             let sibling = if is_sibling_in_queue {
                 queue.pop().unwrap().value
@@ -189,8 +195,7 @@ impl<'a> SmtMultiProof<'a> {
             println!("current: {:?}", current.value);
             println!("sibling: {:?}", sibling);
             tree.store.get_node(&BranchKey::new(current.depth as u8, &current.key)).expect("Failed to get node");
-            let (left, right) =
-                if bit_at(&current.key, current.depth - 1) { (sibling, current.value) } else { (current.value, sibling) };
+            let (left, right) = if bit_at(&current.key, current.depth - 1) { (sibling, current.value) } else { (current.value, sibling) };
             let value = hash_node::<H>(left, right);
             println!("next value: {:?}", value);
             queue.push(QueueItem { key: current.key, depth: current.depth - 1, key_index: current.key_index, value })
@@ -204,12 +209,11 @@ impl<'a> SmtMultiProof<'a> {
     /// TODO: Remove tree parameter
     pub fn verify<H: SmtHasher>(
         &self,
-        keys: &[Hash],
-        leaf_hashes: &[Hash],
+        keys_with_leaf_hashes: &[(Hash, Hash)],
         expected_root: Hash,
         tree: &SparseMerkleTree<H>,
     ) -> Result<bool, SmtMultiProofError> {
-        let computed_root = self.compute_root::<H>(keys, leaf_hashes, tree)?;
+        let computed_root = self.compute_root::<H>(keys_with_leaf_hashes, tree)?;
         println!("Computed root = {:?}", computed_root);
         println!("Expected root = {:?}", expected_root);
         Ok(computed_root == expected_root)
@@ -384,15 +388,87 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 
 #[cfg(test)]
 mod tests {
+    use crate::store::{BranchKey, Node, SmtStore};
     use crate::tree::tests::{Smt, TestHasher, test_key, test_leaf};
-    use std::{println, vec};
+    use crate::tree::{NodeResult, SparseMerkleTree, child_branch_key};
+    use crate::{DEPTH, SmtHasher};
+    use kaspa_hashes::ZERO_HASH;
+    use std::string::String;
+    use std::{format, println, vec};
+    use std::prelude::v1::Vec;
     use zerocopy::IntoBytes;
+
+    /// Resolve the value stored at `key` via [`NodeResult::hash`] (`tree.rs:142`), which handles:
+    /// * `Internal` -> the node's own hash.
+    /// * `Collapsed` -> `hash_node::<H::CollapsedHasher>(lane_key, leaf_hash)` (cf. `proof_single.rs:429`).
+    /// * missing (`None` -> `NodeResult::Empty`) -> `H::empty_hash_at_depth(depth)`.
+    ///
+    /// Returns the value together with the raw node so the caller can decide whether to recurse.
+    fn node_value<H: SmtHasher, S: SmtStore>(tree: &SparseMerkleTree<H, S>, key: &BranchKey) -> (kaspa_hashes::Hash, Option<Node>)
+    where
+        S::Error: std::fmt::Debug,
+    {
+        let node = tree.store.get_node(key).expect("store read failed");
+        let result = match node {
+            None => NodeResult::Empty,
+            Some(Node::Internal(hash)) => NodeResult::Internal { hash },
+            Some(Node::Collapsed(cl)) => NodeResult::Collapsed(cl),
+        };
+        // `result.hash()` takes the parent's depth in case of empty hash.
+        // We can't do `key.depth-1` if it's 0.
+        // Sine it will never be an empty hash when it is 0, we set an arbitrary value for this case.
+        let depth = if key.depth == 0 { 0 } else { key.depth - 1 } as usize;
+        (result.hash::<H>(depth), node)
+    }
+
+    /// Pretty-print the stored structure of an SMT as an indented tree, for debugging.
+    ///
+    /// Every node is labelled with the first 4 hex characters of its value (Internal,
+    /// Collapsed and empty positions alike), the node kind, and its depth.
+    fn print_tree<H: SmtHasher, S: SmtStore>(tree: &SparseMerkleTree<H, S>)
+    where
+        S::Error: std::fmt::Debug,
+    {
+        println!("SMT (root = {})", tree.root());
+        print_subtree(tree, BranchKey::new(0, &ZERO_HASH), String::new(), true, "root");
+    }
+
+    /// Recursive worker for [`print_tree`]: renders the node at `key`, then its children.
+    fn print_subtree<H: SmtHasher, S: SmtStore>(tree: &SparseMerkleTree<H, S>, key: BranchKey, prefix: String, is_last: bool, edge: &str)
+    where
+        S::Error: std::fmt::Debug,
+    {
+        let (value, node) = node_value(tree, &key);
+        let short: String = format!("{value}").chars().take(4).collect();
+        let kind = match node {
+            None => String::from("Empty"),
+            Some(Node::Internal(_)) => String::from("Internal"),
+            Some(Node::Collapsed(cl)) => format!(
+                "Collapsed (lane_key {}, leaf_hash {})",
+                format!("{}", cl.lane_key).chars().take(4).collect::<String>(),
+                format!("{}", cl.leaf_hash).chars().take(4).collect::<String>(),
+            ),
+        };
+        let connector = if is_last { "└── " } else { "├── " };
+        println!("{prefix}{connector}{edge} (d{}) [{short}] {kind}", key.depth);
+
+        // Only Internal nodes have branch children to descend into.
+        if let Some(Node::Internal(_)) = node {
+            let child_prefix = format!("{prefix}{}", if is_last { "    " } else { "│   " });
+            if (key.depth as usize) < DEPTH - 1 {
+                print_subtree(tree, child_branch_key(&key, false), child_prefix.clone(), false, "L");
+                print_subtree(tree, child_branch_key(&key, true), child_prefix, true, "R");
+            } else {
+                // Leaf-parent (depth 255): children are leaves, not branch nodes.
+                println!("{child_prefix}└── (children are leaves)");
+            }
+        }
+    }
 
     #[test]
     fn test_multi_proof() {
         let mut tree = Smt::new();
-        let mut proof_keys = vec![];
-        let mut proof_leaf_hashes = vec![];
+        let mut keys_with_leaf_hashes = vec![];
         for i in 0..9u32 {
             println!("~~~~~ i={i}");
             let key = test_key(i.as_bytes());
@@ -401,16 +477,16 @@ mod tests {
 
             if i.is_multiple_of(5) {
                 println!("adding key: {:?}, value: {:?}", key, value);
-                proof_keys.push(key);
-                proof_leaf_hashes.push(value);
+                keys_with_leaf_hashes.push((key, value));
             }
         }
-        println!("proof_keys: {:?}", proof_keys);
-        println!("proof_leaf_hashes: {:?}", proof_leaf_hashes);
-        proof_keys.sort();
-        let proof = tree.prove_multiple(&proof_keys).unwrap();
+        print_tree(&tree);
+        keys_with_leaf_hashes.sort_by(|a, b| a.0.cmp(&b.0));
+        println!("keys_with_leaf_heashes: {:?}", keys_with_leaf_hashes);
+        let keys = keys_with_leaf_hashes.iter().map(|(key, _)| key.clone()).collect::<Vec<_>>();
+        let proof = tree.prove_multiple(&keys).unwrap();
         assert!(
-            proof.as_proof().verify::<TestHasher>(&proof_keys, &proof_leaf_hashes, tree.root(), &tree).unwrap(),
+            proof.as_proof().verify::<TestHasher>(&keys_with_leaf_hashes, tree.root(), &tree).unwrap(),
             "multi_proof failed"
         );
     }
