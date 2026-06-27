@@ -68,8 +68,9 @@ struct QueueItem {
     value: Hash,
 }
 impl Ord for QueueItem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.depth.cmp(&other.depth).then_with(|| other.key_index.cmp(&self.key_index))
+    fn cmp(&self, other: &Self) -> Ordering {   // We iterate in reversed order, therefore:
+        self.depth.cmp(&other.depth)   // First order by depth top to bottom
+            .then_with(|| self.key_index.cmp(&other.key_index))  // For nodes in the same depth: right-to-left
     }
 }
 
@@ -161,17 +162,22 @@ impl<'a> SmtMultiProof<'a> {
         println!("total sibling count: {}", self.total_sibling_count);
 
         while !queue.is_empty() {
+            println!("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
             let current = queue.pop().unwrap();
             println!("current: {:?}", current);
             let branch_key = BranchKey::new(current.depth as u8, &current.key);
             println!("branch key: {:?}", branch_key);
             println!("From tree: {:?}:", tree.store.get_node(&branch_key).expect("Failed to get node"));
 
-            let is_left = !bit_at(&current.key, current.depth);
-            println!("is_left: {:?}", is_left);
-            // If this is a left branching node, the sibling branch might be inside the proof as well.
+            let is_right = bit_at(&current.key, current.depth - 1);
+            println!("is_right: {:?}", is_right);
+            // If this is a right branching node, the sibling branch might be inside the proof as well.
             // In such a case - it will be the next item in the queue.
-            let is_sibling_in_queue = is_left && queue.peek().is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth));
+            let is_sibling_in_queue = is_right && queue.peek().is_some_and(|next| {
+                println!("Current: Depth:{}, first byte: {:08b}", current.depth, current.key.as_bytes()[0]);
+                println!("Next: Depth:{}, first byte: {:08b}", next.depth, next.key.as_bytes()[0]);
+                current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth - 1)
+            });
             println!("is_sibling_in_queue: {:?}", is_sibling_in_queue);
             let sibling = if is_sibling_in_queue {
                 queue.pop().unwrap().value
