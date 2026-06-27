@@ -477,13 +477,13 @@ mod tests {
     fn test_multi_proof() {
         let mut tree = Smt::new();
         let mut keys_with_leaf_hashes = vec![];
-        for i in 0..9u32 {
+        for i in 0..1000u32 {
             println!("~~~~~ i={i}");
             let key = test_key(i.as_bytes());
             let value = test_leaf(i.as_bytes());
             tree.insert(key, value);
 
-            if i.is_multiple_of(5) {
+            if i.is_multiple_of(3) {
                 println!("adding key: {:?}, value: {:?}", key, value);
                 keys_with_leaf_hashes.push((key, value));
             }
