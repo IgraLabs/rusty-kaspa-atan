@@ -33,8 +33,8 @@ pub mod store;
 pub mod streaming;
 pub mod tree;
 
-use std::println;
 use kaspa_hashes::{Hash, Hasher};
+use std::println;
 
 /// Depth of the sparse Merkle tree (number of levels from root to leaf).
 pub const DEPTH: usize = 256;

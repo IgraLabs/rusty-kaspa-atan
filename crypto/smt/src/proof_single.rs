@@ -33,8 +33,8 @@
 
 use crate::store::{BranchKey, CollapsedLeaf, Node, SmtStore};
 use alloc::vec::Vec;
-use std::{format, println};
 use kaspa_hashes::{Hash, ZERO_HASH};
+use std::{format, println};
 use thiserror::Error;
 /// Cache of already-computed branch hashes, keyed by `(depth, key_prefix)`.
 ///
@@ -48,8 +48,7 @@ use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum SmtProofError {
     // TODO: Add Expected/Actual types here too.
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
-    )]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
     SiblingCountMismatch { expected: usize, actual: usize },
 }
 
@@ -431,7 +430,11 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                         }
                     }
                 } else {
-                    println!("Depth: {}, Key binary: {}", depth, key.as_bytes().iter().map(|b| format!("{:08b}", b)).collect::<Vec<_>>().join(" "));
+                    println!(
+                        "Depth: {}, Key binary: {}",
+                        depth,
+                        key.as_bytes().iter().map(|b| format!("{:08b}", b)).collect::<Vec<_>>().join(" ")
+                    );
                     let goes_right = bit_at(key, depth);
                     println!("goes_right: {:?}", goes_right);
                     // Read the sibling node directly.

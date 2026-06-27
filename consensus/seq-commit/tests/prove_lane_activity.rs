@@ -20,7 +20,7 @@ use kaspa_consensus_core::tx::Transaction;
 use kaspa_hashes::{Hash, SeqCommitActiveNode};
 use kaspa_seq_commit::hashing::*;
 use kaspa_seq_commit::types::*;
-use kaspa_smt::proof::OwnedSmtProof;
+use kaspa_smt::proof_single::OwnedSmtProof;
 use kaspa_smt::tree::SparseMerkleTree;
 
 type Smt = SparseMerkleTree<SeqCommitActiveNode>;

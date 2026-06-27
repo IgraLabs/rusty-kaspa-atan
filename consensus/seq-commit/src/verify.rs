@@ -70,7 +70,6 @@ mod tests {
     use crate::hashing::{activity_root_hash, lane_key, smt_leaf_hash};
     use crate::types::{LaneId, SmtLeafInput};
     use kaspa_hashes::{SeqCommitActiveNode, ZERO_HASH};
-    use kaspa_smt::proof::ProofBranchCache;
     use kaspa_smt::proof_single::ProofBranchCache;
     use kaspa_smt::tree::SparseMerkleTree;
 
