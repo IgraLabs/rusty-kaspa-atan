@@ -169,6 +169,9 @@ impl<'a> SmtMultiProof<'a> {
             println!("branch key: {:?}", branch_key);
             println!("From tree: {:?}:", tree.store.get_node(&branch_key).expect("Failed to get node"));
 
+            if current.depth == 0 {
+                return Ok(current.value);
+            }
             let is_right = bit_at(&current.key, current.depth - 1);
             println!("is_right: {:?}", is_right);
             // If this is a right branching node, the sibling branch might be inside the proof as well.
@@ -184,8 +187,7 @@ impl<'a> SmtMultiProof<'a> {
             } else {
                 println!("bitmap_index: {}", bitmap_index);
                 if bitmap_index == 0 {
-                    println!("bitmap index is 0 - returning {:?}", current);
-                    return Ok(current.value);
+                    panic!("bitmap_index is 0. Loop should have stopped by now");
                 }
                 bitmap_index -= 1;
                 let is_sibling_empty = !self.bitmap_value_at_index(bitmap_index);
