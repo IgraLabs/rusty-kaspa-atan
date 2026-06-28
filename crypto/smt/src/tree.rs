@@ -14,10 +14,11 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::store::{BTreeSmtStore, BranchKey, CollapsedLeaf, LeafUpdate, Node, SmtStore, SortedLeafUpdates, SortedLeafUpdatesRef};
-use crate::{DEPTH, SmtHasher, bit_at, hash_node};
+use crate::{bit_at, hash_node, SmtHasher, DEPTH};
 use core::marker::PhantomData;
-use kaspa_hashes::Hash;
-use std::println;
+use std::{format, println};
+use std::prelude::rust_2015::String;
+use kaspa_hashes::{Hash, ZERO_HASH};
 
 /// A 256-bit Sparse Merkle Tree with incremental updates and cached root.
 ///
@@ -94,7 +95,6 @@ impl<H: SmtHasher> SparseMerkleTree<H, BTreeSmtStore> {
         let sorted = SortedLeafUpdates::from_unsorted(core::iter::once(LeafUpdate { key, leaf_hash }));
         let (new_root, changes) = compute_root_update::<H, _>(&self.store, self.root, sorted).unwrap();
         for (bk, node) in &changes {
-            println!("New change: bk: {:?}, node: {:?}", bk, node);
             self.store.insert_node(*bk, *node);
         }
         self.root = new_root;
@@ -390,7 +390,7 @@ pub(crate) mod tests {
     use crate::proof_single::{OwnedSmtProof, ProofTerminal, SmtProofError};
     use alloc::vec;
     use kaspa_hashes::{HasherBase, SeqCommitActiveNode, ZERO_HASH};
-    use rand::{Rng, SeedableRng, rngs::StdRng};
+    use rand::{rngs::StdRng, Rng, SeedableRng};
 
     pub(crate) type TestHasher = SeqCommitActiveNode;
     pub(crate) type Smt = SparseMerkleTree<TestHasher>;
@@ -2105,4 +2105,73 @@ pub(crate) mod tests {
             run_promote_then_resplit(d_split, d_resplit);
         }
     }
+}
+
+/// A helper method for debugging.
+/// Pretty-print the stored structure of an SMT as an indented tree, for debugging.
+///
+/// Every node is labeled with the first 4 hex characters of its value (Internal,
+/// Collapsed and empty positions alike), the node kind, and its depth.
+#[allow(dead_code)]
+fn print_tree<H: SmtHasher, S: SmtStore>(tree: &SparseMerkleTree<H, S>)
+where
+    S::Error: std::fmt::Debug,
+{
+    println!("SMT (root = {})", tree.root());
+    print_subtree(tree, BranchKey::new(0, &ZERO_HASH), String::new(), true, "root");
+}
+
+/// Recursive worker for [`print_tree`]: renders the node at `key`, then its children.
+fn print_subtree<H: SmtHasher, S: SmtStore>(tree: &SparseMerkleTree<H, S>, key: BranchKey, prefix: String, is_last: bool, edge: &str)
+where
+    S::Error: std::fmt::Debug,
+{
+    let (value, node) = node_value(tree, &key);
+    let short: String = format!("{value}").chars().take(4).collect();
+    let kind = match node {
+        None => String::from("Empty"),
+        Some(Node::Internal(_)) => String::from("Internal"),
+        Some(Node::Collapsed(cl)) => format!(
+            "Collapsed (lane_key {}, leaf_hash {})",
+            format!("{}", cl.lane_key).chars().take(4).collect::<String>(),
+            format!("{}", cl.leaf_hash).chars().take(4).collect::<String>(),
+        ),
+    };
+    let connector = if is_last { "└── " } else { "├── " };
+    println!("{prefix}{connector}{edge} (d{}) [{short}] {kind}", key.depth);
+
+    // Only Internal nodes have branch children to descend into.
+    if let Some(Node::Internal(_)) = node {
+        let child_prefix = format!("{prefix}{}", if is_last { "    " } else { "│   " });
+        if (key.depth as usize) < DEPTH - 1 {
+            print_subtree(tree, child_branch_key(&key, false), child_prefix.clone(), false, "L");
+            print_subtree(tree, child_branch_key(&key, true), child_prefix, true, "R");
+        } else {
+            // Leaf-parent (depth 255): children are leaves, not branch nodes.
+            println!("{child_prefix}└── (children are leaves)");
+        }
+    }
+}
+
+/// Resolve the value stored at `key` via [`NodeResult::hash`] (`tree.rs:142`), which handles:
+/// * `Internal` -> the node's own hash.
+/// * `Collapsed` -> `hash_node::<H::CollapsedHasher>(lane_key, leaf_hash)` (cf. `proof_single.rs:429`).
+/// * missing (`None` -> `NodeResult::Empty`) -> `H::empty_hash_at_depth(depth)`.
+///
+/// Returns the value together with the raw node so the caller can decide whether to recurse.
+fn node_value<H: SmtHasher, S: SmtStore>(tree: &SparseMerkleTree<H, S>, key: &BranchKey) -> (kaspa_hashes::Hash, Option<Node>)
+where
+    S::Error: std::fmt::Debug,
+{
+    let node = tree.store.get_node(key).expect("store read failed");
+    let result = match node {
+        None => NodeResult::Empty,
+        Some(Node::Internal(hash)) => NodeResult::Internal { hash },
+        Some(Node::Collapsed(cl)) => NodeResult::Collapsed(cl),
+    };
+    // `result.hash()` takes the parent's depth in case of empty hash.
+    // We can't do `key.depth-1` if it's 0.
+    // Sine it will never be an empty hash when it is 0, we set an arbitrary value for this case.
+    let depth = if key.depth == 0 { 0 } else { key.depth - 1 } as usize;
+    (result.hash::<H>(depth), node)
 }

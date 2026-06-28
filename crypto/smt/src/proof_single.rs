@@ -34,7 +34,6 @@
 use crate::store::{BranchKey, CollapsedLeaf, Node, SmtStore};
 use alloc::vec::Vec;
 use kaspa_hashes::{Hash, ZERO_HASH};
-use std::{format, println};
 use thiserror::Error;
 /// Cache of already-computed branch hashes, keyed by `(depth, key_prefix)`.
 ///
@@ -48,7 +47,8 @@ use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum SmtProofError {
     // TODO: Add Expected/Actual types here too.
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
+    )]
     SiblingCountMismatch { expected: usize, actual: usize },
 }
 
@@ -411,8 +411,6 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     /// * If this is an internal node - will return its sibling (with None for a zero hash)
     pub(crate) fn get_branching_data(&self, key: &Hash, depth: usize) -> Result<NodeBranchingData, S::Error> {
         let branch_key = BranchKey::new(depth as u8, key);
-        println!("branch_key: {:?}", &branch_key);
-        println!("value at key: {:?}", self.store.get_node(&branch_key)?);
 
         match self.store.get_node(&branch_key)? {
             Some(Node::Internal(_)) => {
@@ -430,23 +428,13 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                         }
                     }
                 } else {
-                    println!(
-                        "Depth: {}, Key binary: {}",
-                        depth,
-                        key.as_bytes().iter().map(|b| format!("{:08b}", b)).collect::<Vec<_>>().join(" ")
-                    );
                     let goes_right = bit_at(key, depth);
-                    println!("goes_right: {:?}", goes_right);
                     // Read the sibling node directly.
                     let sibling_key = child_branch_key(&branch_key, !goes_right);
-                    println!("sibling_key: {:?}", &sibling_key);
                     match self.store.get_node(&sibling_key)? {
                         None => Ok(NodeBranchingData::Sibling(None)),
                         Some(Node::Internal(hash)) => Ok(NodeBranchingData::Sibling(Some(hash))),
-                        Some(Node::Collapsed(cl)) => {
-                            println!("Got collapsed sibling: {:?}", cl);
-                            Ok(NodeBranchingData::Sibling(Some(hash_node::<H::CollapsedHasher>(cl.lane_key, cl.leaf_hash))))
-                        }
+                        Some(Node::Collapsed(cl)) => Ok(NodeBranchingData::Sibling(Some(hash_node::<H::CollapsedHasher>(cl.lane_key, cl.leaf_hash))))
                     }
                 }
             }
