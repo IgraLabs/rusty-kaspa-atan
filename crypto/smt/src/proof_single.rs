@@ -46,7 +46,6 @@ use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum SmtProofError {
-    // TODO: Add Expected/Actual types here too.
     #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
     )]
     SiblingCountMismatch { expected: usize, actual: usize },
@@ -476,7 +475,6 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     break;
                 }
                 NodeBranchingData::EmptySubtree => {
-                    // TODO: Check if should err out here?
                     for d in depth..DEPTH {
                         bitmap[d / 8] |= 1 << (d % 8);
                     }

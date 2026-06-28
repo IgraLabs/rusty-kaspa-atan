@@ -1,5 +1,5 @@
 use crate::proof_single::{NodeBranchingData, ProofTerminal};
-use crate::store::{BranchKey, SmtStore};
+use crate::store::SmtStore;
 use crate::tree::SparseMerkleTree;
 use crate::{are_siblings, bit_at, hash_node, SmtHasher, DEPTH};
 use kaspa_hashes::Hash;
@@ -96,12 +96,13 @@ pub enum SmtMultiProofError {
 }
 
 impl<'a> SmtMultiProof<'a> {
-    /// TODO: Comment
-    /// TODO: Remove tree parameter
+    /// Reconstruct the Merkle root that this proof implies for given `keys_with_leaf_hashes`.
+    ///
+    /// # Arguments
+    /// * `keys_with_leaf_hashes` - A list of (key, leaf_hash) pairs, sorted by key.
     pub fn compute_root<H: SmtHasher>(
         &self,
         keys_with_leaf_hashes: &[(Hash, Hash)],
-        tree: &SparseMerkleTree<H>,
     ) -> Result<Hash, SmtMultiProofError> {
         // 1. Validate the counts of keys_with_leaf_hashes and terminals match
         if self.terminals.len() != keys_with_leaf_hashes.len() {
@@ -179,11 +180,9 @@ impl<'a> SmtMultiProof<'a> {
                 if is_sibling_empty {
                     *(siblings_iter.next().unwrap())
                 } else {
-                    H::empty_hash_at_depth(current.depth - 1) // TODO: Understand why - 1
+                    H::empty_hash_at_depth(current.depth - 1)
                 }
             };
-            let branch_key = BranchKey::new(current.depth as u8, &current.key);
-            tree.store.get_node(&branch_key).expect("Failed to get node");
             let (left, right) = if bit_at(&current.key, current.depth - 1) { (sibling, current.value) } else { (current.value, sibling) };
             let value = hash_node::<H>(left, right);
             queue.push(QueueItem { key: current.key, depth: current.depth - 1, key_index: current.key_index, value })
@@ -194,14 +193,12 @@ impl<'a> SmtMultiProof<'a> {
     /// Verify that the proof is consistent with the given `expected_root`.
     ///
     /// Equivalent to `self.compute_root(keys, leaf_hashes)? == expected_root`.
-    /// TODO: Remove tree parameter
     pub fn verify<H: SmtHasher>(
         &self,
         keys_with_leaf_hashes: &[(Hash, Hash)],
         expected_root: Hash,
-        tree: &SparseMerkleTree<H>,
     ) -> Result<bool, SmtMultiProofError> {
-        let computed_root = self.compute_root::<H>(keys_with_leaf_hashes, tree)?;
+        let computed_root = self.compute_root::<H>(keys_with_leaf_hashes)?;
         Ok(computed_root == expected_root)
     }
 
@@ -263,7 +260,7 @@ impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
 }
 
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
-    /// TODO: comment
+    /// Generate an inclusion proof for the given keys
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
         if !keys.is_sorted() {
             return Err(ProveError::KeysNotSorted);
@@ -319,6 +316,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         let terminals = keys.iter().map(|key| terminals.remove(key).unwrap_or(ProofTerminal::Full)).collect();
         Ok(OwnedSmtMultiProof { bitmap: bitmap.bitmap(), total_sibling_count, siblings, terminals })
     }
+
     /// For a set of given `keys` that are on the same branch at `depth`, this generates the next
     /// proof step, be it a terminal or sibling, and updates the bitmap, siblings and terminals.
     ///
@@ -370,8 +368,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
 #[cfg(test)]
 mod tests {
     use crate::tree::tests::{test_key, test_leaf, Smt, TestHasher};
-    use std::vec;
     use std::prelude::v1::Vec;
+    use std::vec;
     use zerocopy::IntoBytes;
 
 
@@ -392,7 +390,7 @@ mod tests {
         let keys = keys_with_leaf_hashes.iter().map(|(key, _)| key.clone()).collect::<Vec<_>>();
         let proof = tree.prove_multiple(&keys).unwrap();
         assert!(
-            proof.as_proof().verify::<TestHasher>(&keys_with_leaf_hashes, tree.root(), &tree).unwrap(),
+            proof.as_proof().verify::<TestHasher>(&keys_with_leaf_hashes, tree.root()).unwrap(),
             "multi_proof failed"
         );
     }
