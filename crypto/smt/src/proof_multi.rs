@@ -60,13 +60,13 @@ impl OwnedSmtMultiProof {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct QueueItem {
+struct ComputeRootQueueItem {
     key: Hash,
     depth: usize,
     key_index: usize,
     value: Hash,
 }
-impl Ord for QueueItem {
+impl Ord for ComputeRootQueueItem {
     fn cmp(&self, other: &Self) -> Ordering {
         // We iterate in reversed order, therefore:
         self.depth.cmp(&other.depth)   // First order by depth top to bottom
@@ -74,7 +74,7 @@ impl Ord for QueueItem {
     }
 }
 
-impl PartialOrd for QueueItem {
+impl PartialOrd for ComputeRootQueueItem {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -82,13 +82,15 @@ impl PartialOrd for QueueItem {
 
 #[derive(Error, Debug, Clone)]
 pub enum SmtMultiProofError {
-    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
+    #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}"
+    )]
     SiblingCountMismatch { expected: usize, actual: usize },
     #[error("key with leaf hashes count mismatch: expected {expected} keys, but got {actual}")]
     KeyWithLeafHashesCountMismatch { expected: usize, actual: usize },
     #[error("key with leaf hashes are not sorted")]
     KeyWithLeafHashesAreNotSorted,
-    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof")]
+    #[error("CollapsedOther terminal, that is only supported in single exclusion proofs, found in a multi-proof"
+    )]
     CollapsedOtherInMultiProof,
     #[error("There were more siblings provided then required to calculate root")]
     MoreSiblingsThenNeeded,
@@ -133,11 +135,11 @@ impl<'a> SmtMultiProof<'a> {
                 ProofTerminal::CollapsedOther { .. } => return Err(SmtMultiProofError::CollapsedOtherInMultiProof),
                 ProofTerminal::Full => {
                     let (key, leaf_hash) = keys_with_leaf_hashes[i];
-                    queue.push(QueueItem { key, depth: DEPTH, key_index: i, value: hash_node::<H::CollapsedHasher>(key, leaf_hash) });
+                    queue.push(ComputeRootQueueItem { key, depth: DEPTH, key_index: i, value: hash_node::<H::CollapsedHasher>(key, leaf_hash) });
                 }
                 ProofTerminal::Collapsed { depth } => {
                     let (key, leaf_hash) = keys_with_leaf_hashes[i];
-                    queue.push(QueueItem {
+                    queue.push(ComputeRootQueueItem {
                         key,
                         depth: *depth as usize,
                         key_index: i,
@@ -160,10 +162,7 @@ impl<'a> SmtMultiProof<'a> {
             let is_right = bit_at(&current.key, current.depth - 1);
             // If this is a right branching node, the sibling branch might be inside the proof as well.
             // In such a case - it will be the next item in the queue.
-            let is_sibling_in_queue = is_right
-                && queue
-                    .peek()
-                    .is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth - 1));
+            let is_sibling_in_queue = is_right && queue.peek().is_some_and(|next| current.depth == next.depth && are_siblings(&current.key, &next.key, current.depth - 1));
             let sibling = if is_sibling_in_queue {
                 queue.pop().unwrap().value
             } else {
@@ -174,10 +173,9 @@ impl<'a> SmtMultiProof<'a> {
                 let is_sibling_empty = !self.bitmap_value_at_index(bitmap_index);
                 if is_sibling_empty { *(siblings_iter.next().unwrap()) } else { H::empty_hash_at_depth(current.depth - 1) }
             };
-            let (left, right) =
-                if bit_at(&current.key, current.depth - 1) { (sibling, current.value) } else { (current.value, sibling) };
+            let (left, right) = if bit_at(&current.key, current.depth - 1) { (sibling, current.value) } else { (current.value, sibling) };
             let value = hash_node::<H>(left, right);
-            queue.push(QueueItem { key: current.key, depth: current.depth - 1, key_index: current.key_index, value })
+            queue.push(ComputeRootQueueItem { key: current.key, depth: current.depth - 1, key_index: current.key_index, value })
         }
         Err(SmtMultiProofError::MoreSiblingsThenNeeded)
     }
@@ -251,6 +249,11 @@ impl<S: SmtStore> std::fmt::Debug for ProveError<S> {
     }
 }
 
+#[derive(Debug)]
+struct ProveMultipleQueueItem<'a> {
+    keys: &'a [Hash],
+    depth: u8,
+}
 impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
     /// Generate an inclusion proof for the given keys
     pub fn prove_multiple(&self, keys: &[Hash]) -> Result<OwnedSmtMultiProof, ProveError<S>> {
@@ -262,13 +265,8 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
         let mut siblings = Vec::new();
         let mut terminals = HashMap::new();
 
-        #[derive(Debug)]
-        struct QueueItem<'a> {
-            keys: &'a [Hash],
-            depth: u8,
-        }
         let mut queue = VecDeque::new();
-        queue.push_back(QueueItem { keys, depth: 0 });
+        queue.push_back(ProveMultipleQueueItem { keys, depth: 0 });
         while !queue.is_empty() {
             let current = queue.pop_front().unwrap();
 
@@ -285,7 +283,7 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     current.depth as usize,
                 )?;
                 if !is_terminal {
-                    queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
+                    queue.push_back(ProveMultipleQueueItem { keys: right, depth: current.depth + 1 });
                 }
             } else if right.is_empty() {
                 let is_terminal = self.add_next_step_to_proof(
@@ -297,11 +295,11 @@ impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
                     current.depth as usize,
                 )?;
                 if !is_terminal {
-                    queue.push_back(QueueItem { keys: left, depth: current.depth + 1 })
+                    queue.push_back(ProveMultipleQueueItem { keys: left, depth: current.depth + 1 })
                 }
             } else {
-                queue.push_back(QueueItem { keys: left, depth: current.depth + 1 });
-                queue.push_back(QueueItem { keys: right, depth: current.depth + 1 });
+                queue.push_back(ProveMultipleQueueItem { keys: left, depth: current.depth + 1 });
+                queue.push_back(ProveMultipleQueueItem { keys: right, depth: current.depth + 1 });
             }
         }
 
