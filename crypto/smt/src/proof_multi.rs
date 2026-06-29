@@ -1,6 +1,6 @@
-use crate::proof_single::{NodeBranchingData, ProofTerminal};
+use crate::proof_single::ProofTerminal;
 use crate::store::SmtStore;
-use crate::tree::SparseMerkleTree;
+use crate::tree::{NodeBranchingData, SparseMerkleTree};
 use crate::{DEPTH, SmtHasher, are_siblings, bit_at, hash_node};
 use kaspa_hashes::Hash;
 use std::cmp::Ordering;

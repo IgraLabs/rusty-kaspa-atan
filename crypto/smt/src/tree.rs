@@ -13,8 +13,9 @@
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
+use crate::proof_single::ProofTerminal;
 use crate::store::{BTreeSmtStore, BranchKey, CollapsedLeaf, LeafUpdate, Node, SmtStore, SortedLeafUpdates, SortedLeafUpdatesRef};
-use crate::{DEPTH, SmtHasher, bit_at, hash_node};
+use crate::{DEPTH, SmtHasher, bit_at, hash_node, tree};
 use core::marker::PhantomData;
 use kaspa_hashes::{Hash, ZERO_HASH};
 use std::prelude::rust_2015::String;
@@ -2191,4 +2192,61 @@ where
     // Sine it will never be an empty hash when it is 0, we set an arbitrary value for this case.
     let depth = if key.depth == 0 { 0 } else { key.depth - 1 } as usize;
     (result.hash::<H>(depth), node)
+}
+
+#[derive(Debug)]
+pub(crate) enum NodeBranchingData {
+    Sibling(Option<Hash>), // Will be None if
+    Terminal(ProofTerminal),
+    EmptySubtree,
+}
+
+impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
+    /// Retrieves the branching data regarding `branch_key` from the storage
+    ///
+    /// # Returns
+    /// * If this is an internal node - will return its sibling (with None for an empty hash)
+    /// * If this is a collapsed node - will return a `ProofTerminal`
+    /// * If there's no node in this key - will return `t adEmptySubtree`
+    pub(crate) fn get_branching_data(&self, key: &Hash, depth: usize) -> Result<NodeBranchingData, S::Error> {
+        let branch_key = BranchKey::new(depth as u8, key);
+
+        match self.store.get_node(&branch_key)? {
+            Some(Node::Internal(_)) => {
+                if depth == DEPTH - 1 {
+                    // Leaf-parent (depth 255): children are leaves, not branch nodes.
+                    // Use get_leaf instead of child_branch_key to avoid depth+1 overflow.
+                    // Compute sibling key (differs only in the last bit).
+                    let mut sib_bytes = key.as_bytes();
+                    sib_bytes[depth / 8] ^= 0x80 >> (depth % 8);
+                    let sibling_leaf_key = Hash::from_bytes(sib_bytes);
+                    match self.store.get_leaf(&sibling_leaf_key)? {
+                        None => Ok(NodeBranchingData::Sibling(None)),
+                        Some(leaf_hash) => {
+                            Ok(NodeBranchingData::Sibling(Some(hash_node::<H::CollapsedHasher>(sibling_leaf_key, leaf_hash))))
+                        }
+                    }
+                } else {
+                    let goes_right = bit_at(key, depth);
+                    // Read the sibling node directly.
+                    let sibling_key = tree::child_branch_key(&branch_key, !goes_right);
+                    match self.store.get_node(&sibling_key)? {
+                        None => Ok(NodeBranchingData::Sibling(None)),
+                        Some(Node::Internal(hash)) => Ok(NodeBranchingData::Sibling(Some(hash))),
+                        Some(Node::Collapsed(cl)) => {
+                            Ok(NodeBranchingData::Sibling(Some(hash_node::<H::CollapsedHasher>(cl.lane_key, cl.leaf_hash))))
+                        }
+                    }
+                }
+            }
+            Some(Node::Collapsed(cl)) => {
+                if cl.lane_key == *key {
+                    Ok(NodeBranchingData::Terminal(ProofTerminal::Collapsed { depth: depth as u8 }))
+                } else {
+                    Ok(NodeBranchingData::Terminal(ProofTerminal::CollapsedOther { depth: depth as u8, leaf: cl }))
+                }
+            }
+            None => Ok(NodeBranchingData::EmptySubtree),
+        }
+    }
 }
