@@ -417,9 +417,8 @@ mod tests {
             let mut current_hash = hash;
 
             for d in (to_depth..from_depth).rev() {
-                let height = DEPTH - 1 - d;
                 let goes_right = bit_at(representative_key, d);
-                let empty_h = H::EMPTY_HASHES[height];
+                let empty_h = H::empty_hash_at_depth(d);
                 let (left_h, right_h) = if goes_right { (empty_h, current_hash) } else { (current_hash, empty_h) };
                 current_hash = hash_node::<H>(left_h, right_h);
                 let bk = BranchKey::new(d as u8, representative_key);

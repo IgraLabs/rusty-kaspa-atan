@@ -31,7 +31,7 @@ pub enum SmtVerifyError {
     RootMismatch { expected: Hash, computed: Hash },
 
     #[error("proof error: {0}")]
-    ProofError(#[from] kaspa_smt::proof::SmtProofError),
+    ProofError(#[from] kaspa_smt::proof_single::SmtProofError),
 }
 
 /// Verify that the metadata is consistent with the header's `accepted_id_merkle_root` (= seq_commit).
@@ -70,7 +70,7 @@ mod tests {
     use crate::hashing::{activity_root_hash, lane_key, smt_leaf_hash};
     use crate::types::{LaneId, SmtLeafInput};
     use kaspa_hashes::{SeqCommitActiveNode, ZERO_HASH};
-    use kaspa_smt::proof::ProofBranchCache;
+    use kaspa_smt::proof_single::ProofBranchCache;
     use kaspa_smt::tree::SparseMerkleTree;
 
     type Smt = SparseMerkleTree<SeqCommitActiveNode>;

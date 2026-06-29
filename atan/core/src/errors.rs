@@ -1,6 +1,6 @@
 use kaspa_hashes::Hash;
 use kaspa_seq_commit::types::LaneId;
-use kaspa_smt::proof::SmtProofError;
+use kaspa_smt::proof_single::SmtProofError;
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 

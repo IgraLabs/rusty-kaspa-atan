@@ -6,7 +6,7 @@ use kaspa_database::prelude::{BatchDbWriter, DB, StoreError, StoreResult};
 use kaspa_hashes::{Hash, SeqCommitActiveNode};
 use kaspa_smt::store::{BranchKey, CollapsedLeaf, Node};
 use kaspa_smt::streaming::{ChildInfo, MergeSink};
-use kaspa_smt::{DEPTH, SmtHasher, bit_at, hash_node};
+use kaspa_smt::{SmtHasher, bit_at, hash_node};
 use rocksdb::WriteBatch;
 
 use crate::BlockHash;
@@ -139,9 +139,8 @@ impl MergeSink for DbSink<'_> {
     ) -> Result<Hash, Self::Error> {
         let mut current_hash = hash;
         for d in (to_depth..from_depth).rev() {
-            let height = DEPTH - 1 - d;
             let goes_right = bit_at(representative_key, d);
-            let empty_h = SeqCommitActiveNode::EMPTY_HASHES[height];
+            let empty_h = SeqCommitActiveNode::empty_hash_at_depth(d);
             let (left_h, right_h) = if goes_right { (empty_h, current_hash) } else { (current_hash, empty_h) };
             current_hash = hash_node::<SeqCommitActiveNode>(left_h, right_h);
             self.write_node(BranchKey::new(d as u8, representative_key), Node::Internal(current_hash), blue_score)?;

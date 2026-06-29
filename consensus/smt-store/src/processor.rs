@@ -16,17 +16,6 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use kaspa_database::prelude::{BatchDbWriter, DB, DirectDbWriter, StoreError, StoreResult};
-use kaspa_hashes::{Hash, SeqCommitActiveNode, ZERO_HASH};
-use kaspa_seq_commit::hashing::smt_leaf_hash;
-use kaspa_seq_commit::types::SmtLeafInput;
-use kaspa_smt::proof::OwnedSmtProof;
-use kaspa_smt::store::{BranchKey, CollapsedLeaf, Node, SmtStore, SortedLeafUpdates};
-use kaspa_smt::streaming::{ChildInfo, MergeSink, StreamError, StreamingSmtBuilder};
-use kaspa_smt::tree::{SmtNodeChanges, SparseMerkleTree, compute_root_update};
-use kaspa_smt::{DEPTH, SmtHasher, bit_at, hash_node};
-use rocksdb::WriteBatch;
-
 use crate::branch_version_store::DbBranchVersionStore;
 use crate::cache::{BranchEntity, BranchVersionCache, LaneVersionCache};
 use crate::lane_version_store::DbLaneVersionStore;
@@ -34,6 +23,16 @@ use crate::maybe_fork::Verified;
 use crate::score_index::DbScoreIndex;
 use crate::values::LaneTipHash;
 use crate::{BlockHash, LaneKey};
+use kaspa_database::prelude::{BatchDbWriter, DB, DirectDbWriter, StoreError, StoreResult};
+use kaspa_hashes::{Hash, SeqCommitActiveNode, ZERO_HASH};
+use kaspa_seq_commit::hashing::smt_leaf_hash;
+use kaspa_seq_commit::types::SmtLeafInput;
+use kaspa_smt::proof_single::OwnedSmtProof;
+use kaspa_smt::store::{BranchKey, CollapsedLeaf, Node, SmtStore, SortedLeafUpdates};
+use kaspa_smt::streaming::{ChildInfo, MergeSink, StreamError, StreamingSmtBuilder};
+use kaspa_smt::tree::{SmtNodeChanges, SparseMerkleTree, compute_root_update};
+use kaspa_smt::{SmtHasher, bit_at, hash_node};
+use rocksdb::WriteBatch;
 
 struct VersionedBranchReader<'a, F: Fn(Hash) -> bool> {
     stores: &'a SmtStores,
@@ -143,8 +142,7 @@ impl<H: SmtHasher> MergeSink for RootOnlyMergeSink<H> {
         let mut current_hash = hash;
 
         for depth in (to_depth..from_depth).rev() {
-            let height = DEPTH - 1 - depth;
-            let empty_hash = H::EMPTY_HASHES[height];
+            let empty_hash = H::empty_hash_at_depth(depth);
             let goes_right = bit_at(representative_key, depth);
             let (left_hash, right_hash) = if goes_right { (empty_hash, current_hash) } else { (current_hash, empty_hash) };
             current_hash = hash_node::<H>(left_hash, right_hash);

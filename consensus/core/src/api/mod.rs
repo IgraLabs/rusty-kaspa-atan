@@ -64,7 +64,7 @@ pub struct ImportLane {
     pub lane_key: Hash,
     pub lane_tip: Hash,
     pub blue_score: u64,
-    pub proof: Option<kaspa_smt::proof::OwnedSmtProof>,
+    pub proof: Option<kaspa_smt::proof_single::OwnedSmtProof>,
 }
 
 pub type ImportLaneBatchIterator<'a> = &'a mut (dyn Iterator<Item = Vec<ImportLane>> + Send);

@@ -31,19 +31,20 @@
 //! - [`SmtProof`] — borrowed view, zero-alloc, usable in `no_std` / ZK.
 //! - [`OwnedSmtProof`] — owned, delegates to `SmtProof` via `as_proof()`.
 
+use crate::store::{BranchKey, CollapsedLeaf, SmtStore};
 use alloc::vec::Vec;
 use kaspa_hashes::{Hash, ZERO_HASH};
-
-use crate::store::{BranchKey, CollapsedLeaf};
+use thiserror::Error;
 /// Cache of already-computed branch hashes, keyed by `(depth, key_prefix)`.
 ///
 /// Used by [`SmtProof::verify_cached`] to skip redundant `hash_node` calls when
 /// verifying multiple proofs against the same tree root. Upper branches are
 /// shared across proofs, so this can significantly reduce hashing work.
 pub type ProofBranchCache = alloc::collections::BTreeMap<BranchKey, Hash>;
+use crate::tree::{NodeBranchingData, SparseMerkleTree};
 use crate::{DEPTH, SmtHasher, bit_at, hash_node};
 
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum SmtProofError {
     #[error("sibling count mismatch: bitmap implies {expected} non-empty siblings, but got {actual}")]
     SiblingCountMismatch { expected: usize, actual: usize },
@@ -126,84 +127,6 @@ fn bitmap_clear_count_before(bitmap: &[u8; 32], terminal: ProofTerminal) -> usiz
     (0..limit).filter(|&d| !is_empty_at_depth(bitmap, d)).count()
 }
 
-/// Reconstruct the Merkle root from a proof, optionally using a branch cache.
-///
-/// # Terminal-dependent initial state
-///
-/// The starting hash (`current`) depends on [`ProofTerminal`]:
-///
-/// | Terminal | `leaf_hash` | Initial `current` |
-/// |---|---|---|
-/// | `CollapsedOther` | `None`, different key | `hash(collapsed, foreign_key, foreign_leaf)` — non-inclusion witness |
-/// | `CollapsedOther` | `None`, same key | `ZERO_HASH` — proves non-membership inside that subtree |
-/// | any | `Some(lh)` | `hash(collapsed, queried_key, lh)` — inclusion proof |
-/// | any | `None` | `ZERO_HASH` — non-inclusion (empty subtree) |
-///
-/// After seeding `current`, the function hashes upward from `terminal.depth() - 1`
-/// to the root (depth 0), consuming siblings in reverse bitmap order.
-///
-/// If `cache` is provided, each intermediate branch node is looked up before hashing;
-/// cache hits skip the hash computation and new results are inserted.
-fn compute_root_inner<H: SmtHasher>(
-    bitmap: &[u8; 32],
-    siblings: &[Hash],
-    terminal: ProofTerminal,
-    key: &Hash,
-    leaf_hash: Option<Hash>,
-    mut cache: Option<&mut ProofBranchCache>,
-) -> Result<Hash, SmtProofError> {
-    // Validate that the sibling count matches the bitmap up to the terminal depth.
-    let expected = bitmap_clear_count_before(bitmap, terminal);
-    if siblings.len() != expected {
-        return Err(SmtProofError::SiblingCountMismatch { expected, actual: siblings.len() });
-    }
-
-    // Seed the initial hash based on the terminal variant and queried leaf.
-    let mut current = match (terminal, leaf_hash) {
-        // Non-inclusion: collapsed subtree holds a different key → start from foreign leaf hash.
-        (ProofTerminal::CollapsedOther { leaf, .. }, None) if leaf.lane_key != *key => {
-            hash_node::<H::CollapsedHasher>(leaf.lane_key, leaf.leaf_hash)
-        }
-        // Edge case: CollapsedOther but the key matches → treat as empty (non-membership).
-        (ProofTerminal::CollapsedOther { .. }, None) => ZERO_HASH,
-        // Inclusion proof: hash the queried key with its leaf value.
-        (_, Some(leaf_hash)) => hash_node::<H::CollapsedHasher>(*key, leaf_hash),
-        // Non-inclusion: subtree is empty.
-        (_, None) => ZERO_HASH,
-    };
-    let mut sib_idx = siblings.len();
-    let limit = terminal.depth();
-
-    // d ranges from limit-1 down to 0. limit <= DEPTH (256).
-    // EMPTY_HASHES[DEPTH - 1 - d]: d < DEPTH, so index is in 0..=255 (safe).
-    // BranchKey::new(d as u8, ..): d < 256, so u8 cast is safe.
-    for d in (0..limit).rev() {
-        let sibling = if is_empty_at_depth(bitmap, d) {
-            H::EMPTY_HASHES[DEPTH - 1 - d]
-        } else {
-            sib_idx -= 1;
-            siblings[sib_idx]
-        };
-
-        let (left, right) = if bit_at(key, d) { (sibling, current) } else { (current, sibling) };
-
-        current = if let Some(ref mut cache) = cache {
-            let bk = BranchKey::new(d as u8, key);
-            if let Some(&cached_hash) = cache.get(&bk) {
-                cached_hash
-            } else {
-                let node_hash = hash_node::<H>(left, right);
-                cache.insert(bk, node_hash);
-                node_hash
-            }
-        } else {
-            hash_node::<H>(left, right)
-        };
-    }
-
-    Ok(current)
-}
-
 /// Borrowed, zero-copy compressed proof for a 256-bit Sparse Merkle Tree.
 ///
 /// Suitable for `no_std` / ZK contexts since it requires no allocation.
@@ -229,14 +152,14 @@ impl<'a> SmtProof<'a> {
     /// The reconstruction respects [`self.terminal`](ProofTerminal) to determine the starting
     /// hash and loop depth. Returns an error if the sibling count doesn't match the bitmap.
     pub fn compute_root<H: SmtHasher>(&self, key: &Hash, leaf_hash: Option<Hash>) -> Result<Hash, SmtProofError> {
-        compute_root_inner::<H>(self.bitmap, self.siblings, self.terminal, key, leaf_hash, None)
+        self.compute_root_inner::<H>(key, leaf_hash, None)
     }
 
-    /// Verify that the proof is consistent with the given `root`.
+    /// Verify that the proof is consistent with the given `expected_root`.
     ///
-    /// Equivalent to `self.compute_root(key, leaf_hash)? == root`.
-    pub fn verify<H: SmtHasher>(&self, key: &Hash, leaf_hash: Option<Hash>, root: Hash) -> Result<bool, SmtProofError> {
-        Ok(self.compute_root::<H>(key, leaf_hash)? == root)
+    /// Equivalent to `self.compute_root(key, leaf_hash)? == exptected_root`.
+    pub fn verify<H: SmtHasher>(&self, key: &Hash, leaf_hash: Option<Hash>, expected_root: Hash) -> Result<bool, SmtProofError> {
+        Ok(self.compute_root::<H>(key, leaf_hash)? == expected_root)
     }
 
     /// Verify the proof while populating `cache` with intermediate branch hashes.
@@ -248,11 +171,87 @@ impl<'a> SmtProof<'a> {
         &self,
         key: &Hash,
         leaf_hash: Option<Hash>,
-        root: Hash,
+        expected_root: Hash,
         cache: &mut ProofBranchCache,
     ) -> Result<bool, SmtProofError> {
-        let computed = compute_root_inner::<H>(self.bitmap, self.siblings, self.terminal, key, leaf_hash, Some(cache))?;
-        Ok(computed == root)
+        let computed = self.compute_root_inner::<H>(key, leaf_hash, Some(cache))?;
+        Ok(computed == expected_root)
+    }
+
+    /// Reconstruct the Merkle root from a proof, optionally using a branch cache.
+    ///
+    /// # Terminal-dependent initial state
+    ///
+    /// The starting hash (`current`) depends on [`ProofTerminal`]:
+    ///
+    /// | Terminal | `leaf_hash` | Initial `current` |
+    /// |---|---|---|
+    /// | `CollapsedOther` | `None`, different key | `hash(collapsed, foreign_key, foreign_leaf)` — non-inclusion witness |
+    /// | `CollapsedOther` | `None`, same key | `ZERO_HASH` — proves non-membership inside that subtree |
+    /// | any | `Some(lh)` | `hash(collapsed, queried_key, lh)` — inclusion proof |
+    /// | any | `None` | `ZERO_HASH` — non-inclusion (empty subtree) |
+    ///
+    /// After seeding `current`, the function hashes upward from `terminal.depth() - 1`
+    /// to the root (depth 0), consuming siblings in reverse bitmap order.
+    ///
+    /// If `cache` is provided, each intermediate branch node is looked up before hashing;
+    /// cache hits skip the hash computation and new results are inserted.
+    fn compute_root_inner<H: SmtHasher>(
+        &self,
+        key: &Hash,
+        leaf_hash: Option<Hash>,
+        mut cache: Option<&mut ProofBranchCache>,
+    ) -> Result<Hash, SmtProofError> {
+        // Validate that the sibling count matches the bitmap up to the terminal depth.
+        let expected_sibling_count = bitmap_clear_count_before(self.bitmap, self.terminal);
+        if self.siblings.len() != expected_sibling_count {
+            return Err(SmtProofError::SiblingCountMismatch { expected: expected_sibling_count, actual: self.siblings.len() });
+        }
+
+        // Seed the initial hash based on the terminal variant and queried leaf.
+        let mut current = match (self.terminal, leaf_hash) {
+            // Non-inclusion: collapsed subtree holds a different key → start from foreign leaf hash.
+            (ProofTerminal::CollapsedOther { leaf, .. }, None) if leaf.lane_key != *key => {
+                hash_node::<H::CollapsedHasher>(leaf.lane_key, leaf.leaf_hash)
+            }
+            // Edge case: CollapsedOther but the key matches → treat as empty (non-membership).
+            (ProofTerminal::CollapsedOther { .. }, None) => ZERO_HASH,
+            // Inclusion proof: hash the queried key with its leaf value.
+            (_, Some(leaf_hash)) => hash_node::<H::CollapsedHasher>(*key, leaf_hash),
+            // Non-inclusion: subtree is empty.
+            (_, None) => ZERO_HASH,
+        };
+        let mut sib_idx = self.siblings.len();
+        let limit = self.terminal.depth();
+
+        // d ranges from limit-1 down to 0. limit <= DEPTH (256).
+        // EMPTY_HASHES[DEPTH - 1 - d]: d < DEPTH, so index is in 0..=255 (safe).
+        // BranchKey::new(d as u8, ..): d < 256, so u8 cast is safe.
+        for d in (0..limit).rev() {
+            let sibling = if is_empty_at_depth(self.bitmap, d) {
+                H::empty_hash_at_depth(d)
+            } else {
+                sib_idx -= 1;
+                self.siblings[sib_idx]
+            };
+
+            let (left, right) = if bit_at(key, d) { (sibling, current) } else { (current, sibling) };
+
+            current = if let Some(ref mut cache) = cache {
+                let bk = BranchKey::new(d as u8, key);
+                if let Some(&cached_hash) = cache.get(&bk) {
+                    cached_hash
+                } else {
+                    let node_hash = hash_node::<H>(left, right);
+                    cache.insert(bk, node_hash);
+                    node_hash
+                }
+            } else {
+                hash_node::<H>(left, right)
+            };
+        }
+
+        Ok(current)
     }
 
     /// Number of non-empty (explicitly stored) sibling hashes in this proof.
@@ -380,9 +379,9 @@ impl OwnedSmtProof {
         self.as_proof().compute_root::<H>(key, leaf_hash)
     }
 
-    /// Verify against `root`. Delegates to [`SmtProof::verify`].
-    pub fn verify<H: SmtHasher>(&self, key: &Hash, leaf_hash: Option<Hash>, root: Hash) -> Result<bool, SmtProofError> {
-        self.as_proof().verify::<H>(key, leaf_hash, root)
+    /// Verify against `expected_root`. Delegates to [`SmtProof::verify`].
+    pub fn verify<H: SmtHasher>(&self, key: &Hash, leaf_hash: Option<Hash>, expected_root: Hash) -> Result<bool, SmtProofError> {
+        self.as_proof().verify::<H>(key, leaf_hash, expected_root)
     }
 
     /// Number of non-empty (explicitly stored) sibling hashes.
@@ -393,5 +392,45 @@ impl OwnedSmtProof {
     /// Number of empty (bitmap-elided) sibling positions.
     pub fn empty_count(&self) -> usize {
         DEPTH - self.siblings.len()
+    }
+}
+
+impl<H: SmtHasher, S: SmtStore> SparseMerkleTree<H, S> {
+    /// Generate an inclusion or non-inclusion proof for the given key.
+    ///
+    /// Walks from root to leaf reading stored branch nodes.
+    /// Handles both `Internal` and `Collapsed` (SLO) nodes.
+    pub fn prove(&self, key: &Hash) -> Result<OwnedSmtProof, S::Error> {
+        let mut bitmap = [0u8; 32];
+        let mut siblings = Vec::new();
+        let mut terminal = ProofTerminal::Full;
+
+        for depth in 0..DEPTH {
+            match self.get_branching_data(key, depth)? {
+                NodeBranchingData::Sibling(sibling) => match sibling {
+                    None => {
+                        bitmap[depth / 8] |= 1 << (depth % 8);
+                    }
+                    Some(sibling_hash) => {
+                        siblings.push(sibling_hash);
+                    }
+                },
+                NodeBranchingData::Terminal(proof_terminal) => {
+                    for d in depth..DEPTH {
+                        bitmap[d / 8] |= 1 << (d % 8);
+                    }
+                    terminal = proof_terminal;
+                    break;
+                }
+                NodeBranchingData::EmptySubtree => {
+                    for d in depth..DEPTH {
+                        bitmap[d / 8] |= 1 << (d % 8);
+                    }
+                    break;
+                }
+            }
+        }
+
+        Ok(OwnedSmtProof { bitmap, siblings, terminal })
     }
 }

@@ -24,11 +24,11 @@
 
 extern crate alloc;
 extern crate core;
-
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod proof;
+pub mod proof_multi;
+pub mod proof_single;
 pub mod store;
 pub mod streaming;
 pub mod tree;
@@ -58,6 +58,17 @@ pub fn hash_node<H: Hasher>(left: Hash, right: Hash) -> Hash {
 #[inline]
 pub fn bit_at(key: &Hash, d: usize) -> bool {
     key.as_slice()[d / 8] & (0x80 >> (d % 8)) != 0
+}
+
+/// Returns true iff `this` and `other` are siblings at depth `d`.
+pub fn are_siblings(this: &Hash, other: &Hash, d: usize) -> bool {
+    for i in 0..d {
+        if bit_at(this, i) != bit_at(other, i) {
+            return false;
+        }
+    }
+
+    bit_at(this, d) != bit_at(other, d)
 }
 
 /// Precompute empty subtree hashes at runtime for every level of the tree.
@@ -100,6 +111,11 @@ pub trait SmtHasher: Hasher {
     #[inline]
     fn empty_root() -> Hash {
         Self::EMPTY_HASHES[DEPTH]
+    }
+
+    #[inline]
+    fn empty_hash_at_depth(depth: usize) -> Hash {
+        Self::EMPTY_HASHES[DEPTH - 1 - depth]
     }
 }
 
